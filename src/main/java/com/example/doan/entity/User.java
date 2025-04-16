@@ -15,7 +15,7 @@ import java.util.Set;
 @Data
 @Builder
 @RequiredArgsConstructor
-@Table(name = "users")
+@Table(name = "user")
 @AllArgsConstructor
 public class User {
 
@@ -37,7 +37,11 @@ public class User {
     private String phoneNumber;
     private String address;
 
-    private Set<String> roles;
+    @ManyToOne
+    @JoinColumn(name = "role_id", nullable = false)
+    private Role role;
 
+    @Column(name = "is_verified")
+    private Boolean isVerified = false;
 
 }

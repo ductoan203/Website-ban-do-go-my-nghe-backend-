@@ -1,7 +1,8 @@
 package com.example.doan.config;
 
+import com.example.doan.entity.Role;
 import com.example.doan.entity.User;
-import com.example.doan.enums.Role;
+import com.example.doan.repository.RoleRepository;
 import com.example.doan.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,21 +23,31 @@ public class ApplicationInitConfig {
     PasswordEncoder passwordEncoder;
 
     @Bean
-    ApplicationRunner applicationRunner(UserRepository userRepository) {
+    ApplicationRunner applicationRunner(UserRepository userRepository, RoleRepository roleRepository) {
         return args -> {
-            if (userRepository.findByUsername("admin").isEmpty()){
-                var roles = new HashSet<String>();
-                roles.add(Role.ADMIN.name());
+            // Tạo role ADMIN nếu chưa có
+            Role adminRole = roleRepository.findByName("ADMIN")
+                    .orElseGet(() -> roleRepository.save(new Role("ADMIN")));
 
-                User user = User.builder()
+            // Tạo role USER nếu chưa có
+            Role userRole = roleRepository.findByName("USER")
+                    .orElseGet(() -> roleRepository.save(new Role("USER")));
+
+            // Tạo admin user nếu chưa có
+            if (userRepository.findByUsername("admin").isEmpty()) {
+                User adminUser = User.builder()
                         .username("admin")
                         .password(passwordEncoder.encode("admin123"))
-                        .roles(roles)
+                        .email("admin@gmail.com")
+                        .fullname("Admin User")
+                        .role(adminRole)
                         .build();
 
-                userRepository.save(user);
 
-                log.warn("Admin account created with username: admin and password: admin");
+
+                userRepository.save(adminUser);
+
+                log.info("Admin account created with username: admin");
             }
         };
     }

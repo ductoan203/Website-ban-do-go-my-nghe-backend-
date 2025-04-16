@@ -5,6 +5,8 @@ import com.example.doan.dto.request.IntrospectRequest;
 import com.example.doan.dto.response.AuthenticationResponse;
 import com.example.doan.dto.response.IntrospectRespone;
 import com.example.doan.entity.User;
+import com.example.doan.exception.AppException;
+import com.example.doan.exception.ErrorCode;
 import com.example.doan.repository.UserRepository;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
@@ -58,8 +60,14 @@ public class AuthenticatonService {
     }
 
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
+
         var user = userRepository.findByUsername(request.getUsername()).
                 orElseThrow(() -> new RuntimeException("User not found"));
+
+        // ✅ Chỉ chặn nếu là USER mà chưa xác minh
+        if ("USER".equalsIgnoreCase(user.getRole().getName()) && !Boolean.TRUE.equals(user.getIsVerified())) {
+            throw new AppException(ErrorCode.USER_NOT_VERIFIED);
+        }
 
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         boolean authenticated = passwordEncoder.matches(request.getPassword(),
@@ -86,7 +94,7 @@ public class AuthenticatonService {
                 .expirationTime(new Date(
                         Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()
                 ))
-                .claim("scope", buildScope(user))
+                .claim("roles", Collections.singletonList(user.getRole().getName()))
                 .build();
 
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());
@@ -103,11 +111,10 @@ public class AuthenticatonService {
     }
 
     private String buildScope(User user){
-        StringJoiner stringJoiner = new StringJoiner(" ");
-        if (!CollectionUtils.isEmpty(user.getRoles()))
-            user.getRoles().forEach(stringJoiner::add);
-
-        return stringJoiner.toString();
+        if (user.getRole() != null){
+            return user.getRole().getName();
+        }
+        return "";
 
     }
 }

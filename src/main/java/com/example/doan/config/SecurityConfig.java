@@ -17,10 +17,12 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+@EnableTransactionManagement
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -30,36 +32,46 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity.authorizeHttpRequests(request ->
-                request.requestMatchers(HttpMethod.POST, "/user").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/auth/introspect").permitAll()
+        httpSecurity.csrf(AbstractHttpConfigurer::disable);
 
-                        .requestMatchers(HttpMethod.GET, "/user").hasRole(Role.ADMIN.name())
-                        .anyRequest().authenticated());
+        httpSecurity.authorizeHttpRequests(request -> request
+                // ✅ Public - không cần đăng nhập
+                //.requestMatchers(HttpMethod.POST, "/auth/login", "/auth/register", "/auth/introspect","/auth/verify-otp").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/products/**", "/categories/**","/auth/test-email").permitAll()
 
-        httpSecurity.oauth2ResourceServer(oauth2 ->
-                oauth2.jwt(jwtConfigurer ->
-                        jwtConfigurer.decoder(jwtDecoder())
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter()))
-                        .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
+                // ✅ Trang quản trị - cần ADMIN
+                .requestMatchers("/admin/**").hasRole(Role.ADMIN.name())
+
+                // ✅ Trang cá nhân người dùng
+                .requestMatchers("/me/**").hasAnyRole(Role.USER.name(), Role.ADMIN.name())
+
+                // ✅ Mặc định: phải xác thực
+                .anyRequest().authenticated()
+
         );
 
-        httpSecurity.csrf(AbstractHttpConfigurer::disable);
+        httpSecurity.oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt
+                        .decoder(jwtDecoder())
+                        .jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
+        );
 
         return httpSecurity.build();
     }
 
     @Bean
-    JwtAuthenticationConverter jwtAuthenticationConverter(){
-        JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        jwtGrantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
+    public JwtAuthenticationConverter jwtAuthenticationConverter() {
+        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
+        grantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("roles"); // Đặt đúng tên claim chứa role
 
         JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
-        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(jwtGrantedAuthoritiesConverter);
-
+        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
         return jwtAuthenticationConverter;
     }
+
 
     @Bean
     JwtDecoder jwtDecoder() {
