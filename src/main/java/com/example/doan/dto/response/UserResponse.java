@@ -20,5 +20,5 @@ public class UserResponse {
     private String fullname;
     private String phoneNumber;
     private String address;
-    private String role; // Gắn với quyền (Role)
+    //private String role; // Gắn với quyền (Role)
 }

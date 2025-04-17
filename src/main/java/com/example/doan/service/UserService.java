@@ -103,7 +103,7 @@ public class UserService {
                 .fullname(user.getFullname())
                 .phoneNumber(user.getPhoneNumber())
                 .address(user.getAddress())
-                .role(user.getRole().getName())
+                //.role(user.getRole().getName())
                 .build();
     }
 
@@ -113,7 +113,7 @@ public class UserService {
         return updateUserFields(user, request);
     }
 
-    // ✅ USER chỉ được sửa chính mình
+    //  USER chỉ được sửa chính mình
     public User updateMyInfo(UserUpdateRequest request) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
 

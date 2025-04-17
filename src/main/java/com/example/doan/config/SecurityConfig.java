@@ -44,7 +44,7 @@ public class SecurityConfig {
                 .requestMatchers("/admin/**").hasRole(Role.ADMIN.name())
 
                 // ✅ Trang cá nhân người dùng
-                .requestMatchers("/me/**").hasAnyRole(Role.USER.name(), Role.ADMIN.name())
+                .requestMatchers("/user/**").hasAnyRole(Role.USER.name(), Role.ADMIN.name())
 
                 // ✅ Mặc định: phải xác thực
                 .anyRequest().authenticated()

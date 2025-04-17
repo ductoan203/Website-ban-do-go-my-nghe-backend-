@@ -20,8 +20,9 @@
         USER_NOT_VERIFIED("User has not been verified", 1010, HttpStatus.UNAUTHORIZED),
         USER_ALREADY_VERIFIED("User has already been verified", 1011, HttpStatus.BAD_REQUEST),
 
-
-
+        INVALID_CATEGORY_NAME("Category name already exists", 1012, HttpStatus.BAD_REQUEST),
+        CATEGOTY_NOT_FOUND("Category not found", 1013, HttpStatus.NOT_FOUND),
+        CATEGORY_DELETE_FAILED("Không thể xoá danh mục vì đang chứa sản phẩm", 1014, HttpStatus.BAD_REQUEST),
 
 
         ;
