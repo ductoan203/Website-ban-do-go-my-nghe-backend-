@@ -9,6 +9,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -33,6 +34,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity.csrf(AbstractHttpConfigurer::disable);
+        httpSecurity.cors(Customizer.withDefaults());
 
         httpSecurity.authorizeHttpRequests(request -> request
                 // ✅ Public - không cần đăng nhập
@@ -44,7 +46,7 @@ public class SecurityConfig {
                 .requestMatchers("/admin/**").hasRole(Role.ADMIN.name())
 
                 // ✅ Trang cá nhân người dùng
-                .requestMatchers("/user/**").hasAnyRole(Role.USER.name(), Role.ADMIN.name())
+                .requestMatchers("/user/**", "/orders/checkout","/orders/me").hasAnyRole(Role.USER.name(), Role.ADMIN.name())
 
                 // ✅ Mặc định: phải xác thực
                 .anyRequest().authenticated()

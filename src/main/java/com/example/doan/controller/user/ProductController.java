@@ -18,7 +18,7 @@ public class ProductController {
 
     private final ProductService productService;
 
-    // ✅ Lấy tất cả sản phẩm (đơn giản)
+    // Lấy tất cả sản phẩm (đơn giản)
     @GetMapping("/all")
     public ApiResponse<List<Product>> getAllProducts() {
         return ApiResponse.<List<Product>>builder()
@@ -26,7 +26,7 @@ public class ProductController {
                 .build();
     }
 
-    // ✅ Lấy theo phân trang + tìm kiếm + danh mục
+    // Lấy theo phân trang + tìm kiếm + danh mục
 //    @GetMapping
 //    public ApiResponse<Page<Product>> searchProducts(
 //            @RequestParam(defaultValue = "") String keyword,
@@ -40,7 +40,7 @@ public class ProductController {
 //                .build();
 //    }
 
-    // ✅ Xem chi tiết sản phẩm
+    // Xem chi tiết sản phẩm
     @GetMapping("/{id}")
     public ApiResponse<Product> getProductById(@PathVariable Long id) {
         return ApiResponse.<Product>builder()
