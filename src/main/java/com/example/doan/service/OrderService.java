@@ -87,6 +87,8 @@ public class OrderService {
                 .status(order.getStatus().name())
                 .total(order.getTotal())
                 .createdAt(order.getCreatedAt())
+                .paymentMethod(order.getPaymentMethod())
+                .paymentStatus(order.getPaymentStatus())
                 .items(items)
                 .build();
     }
@@ -149,5 +151,14 @@ public class OrderService {
                 : orderRepository.findByUser(user);
         return orders.stream().map(this::convertToDto).toList();
     }
+    public Order findById(Long id) {
+        return orderRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
+    public Order save(Order order) {
+        return orderRepository.save(order);
+    }
+
 
 }

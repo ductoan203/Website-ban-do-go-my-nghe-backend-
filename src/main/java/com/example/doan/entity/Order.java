@@ -39,4 +39,7 @@ public class Order {
     public enum OrderStatus {
         PENDING, CONFIRMED, SHIPPED, CANCELLED
     }
+    private String paymentMethod;  // "COD" hoặc "ONLINE"
+    private String paymentStatus;  // "PAID", "UNPAID", "FAILED"
+
 }

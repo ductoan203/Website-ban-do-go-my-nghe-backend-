@@ -16,4 +16,6 @@ public class OrderResponse {
     private BigDecimal total;
     private Instant createdAt;
     private List<OrderItemResponse> items;
+    private String paymentMethod;  // "COD" hoặc "ONLINE"
+    private String paymentStatus;
 }

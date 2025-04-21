@@ -1,0 +1,73 @@
+package com.example.doan.service;
+
+import com.example.doan.config.MomoConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.codec.digest.HmacUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class MomoService {
+    private final MomoConfig momoConfig;
+    private final ObjectMapper objectMapper;
+
+    private RestTemplate restTemplate;
+
+    @PostConstruct
+    public void init() {
+        this.restTemplate = new RestTemplate();
+    }
+
+    public String createPaymentUrl(String orderId, Long amount) throws Exception {
+        String requestId = UUID.randomUUID().toString();
+
+        Map<String, Object> rawData = new HashMap<>();
+        rawData.put("partnerCode", momoConfig.getPartnerCode());
+        rawData.put("accessKey", momoConfig.getAccessKey());
+        rawData.put("requestId", requestId);
+        rawData.put("amount", String.valueOf(amount));
+        rawData.put("orderId", orderId);
+        rawData.put("orderInfo", "Thanh toán đơn hàng " + orderId);
+        rawData.put("returnUrl", momoConfig.getRedirectUrl());
+        rawData.put("requestType", "captureWallet");
+        rawData.put("extraData", "");
+
+        String rawSignature = "accessKey=" + momoConfig.getAccessKey()
+                + "&amount=" + amount
+                + "&extraData="
+                + "&ipnUrl=" + momoConfig.getIpnUrl()
+                + "&orderId=" + orderId
+                + "&orderInfo=Thanh toán đơn hàng " + orderId
+                + "&partnerCode=" + momoConfig.getPartnerCode()
+                + "&redirectUrl=" + momoConfig.getRedirectUrl()
+                + "&requestId=" + requestId
+                + "&requestType=captureWallet";
+
+
+        String signature = HmacUtils.hmacSha256Hex(momoConfig.getSecretKey(), rawSignature);
+
+        rawData.put("signature", signature);
+
+        String response = restTemplate.postForObject(
+                momoConfig.getEndpoint(), rawData, String.class);
+
+        Map<String, Object> responseMap = objectMapper.readValue(response, Map.class);
+
+        return (String) responseMap.get("payUrl");
+    }
+    public String getAccessKey() {
+        return momoConfig.getAccessKey();
+    }
+
+    public String getSecretKey() {
+        return momoConfig.getSecretKey();
+    }
+
+}
