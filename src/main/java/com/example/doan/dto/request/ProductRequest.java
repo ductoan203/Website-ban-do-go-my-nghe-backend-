@@ -17,5 +17,6 @@ public class ProductRequest {
     private String dimensions;
     private Integer quantityInStock;
     private Long categoryId;
-    private List<String> imageUrls;
+    private List<String> images;
+    //private List<String> imageUrls;
 }

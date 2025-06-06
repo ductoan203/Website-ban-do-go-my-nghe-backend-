@@ -24,9 +24,9 @@ public class AdminCategoryController {
     }
 
     @GetMapping
-    public ApiResponse<List<Category>> getAllCategories() {
+    public ApiResponse<List<Category>> getAllCategories(@RequestParam(required = false) String searchTerm) {
         return ApiResponse.<List<Category>>builder()
-                .result(categoryService.getAll())
+                .result(categoryService.getAll(searchTerm))
                 .build();
     }
 
@@ -35,6 +35,13 @@ public class AdminCategoryController {
         categoryService.delete(id);
         return ApiResponse.<String>builder()
                 .result("Xoá danh mục thành công")
+                .build();
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<Category> updateCategory(@PathVariable Long id, @RequestBody CategoryRequest request) {
+        return ApiResponse.<Category>builder()
+                .result(categoryService.update(id, request))
                 .build();
     }
 }

@@ -27,41 +27,42 @@ public class MomoService {
 
     public String createPaymentUrl(String orderId, Long amount) throws Exception {
         String requestId = UUID.randomUUID().toString();
+        String momoOrderId = orderId;
 
         Map<String, Object> rawData = new HashMap<>();
         rawData.put("partnerCode", momoConfig.getPartnerCode());
         rawData.put("accessKey", momoConfig.getAccessKey());
         rawData.put("requestId", requestId);
         rawData.put("amount", String.valueOf(amount));
-        rawData.put("orderId", orderId);
+        rawData.put("orderId", momoOrderId);
         rawData.put("orderInfo", "Thanh toán đơn hàng " + orderId);
-        rawData.put("returnUrl", momoConfig.getRedirectUrl());
-        rawData.put("requestType", "captureWallet");
+        rawData.put("redirectUrl", momoConfig.getRedirectUrl());
+        rawData.put("ipnUrl", momoConfig.getIpnUrl());
         rawData.put("extraData", "");
+        rawData.put("requestType", "captureWallet");
+        rawData.put("lang", "vi");
 
         String rawSignature = "accessKey=" + momoConfig.getAccessKey()
                 + "&amount=" + amount
                 + "&extraData="
                 + "&ipnUrl=" + momoConfig.getIpnUrl()
-                + "&orderId=" + orderId
+                + "&orderId=" + momoOrderId
                 + "&orderInfo=Thanh toán đơn hàng " + orderId
                 + "&partnerCode=" + momoConfig.getPartnerCode()
                 + "&redirectUrl=" + momoConfig.getRedirectUrl()
                 + "&requestId=" + requestId
                 + "&requestType=captureWallet";
 
-
         String signature = HmacUtils.hmacSha256Hex(momoConfig.getSecretKey(), rawSignature);
-
         rawData.put("signature", signature);
 
         String response = restTemplate.postForObject(
                 momoConfig.getEndpoint(), rawData, String.class);
 
         Map<String, Object> responseMap = objectMapper.readValue(response, Map.class);
-
         return (String) responseMap.get("payUrl");
     }
+
     public String getAccessKey() {
         return momoConfig.getAccessKey();
     }

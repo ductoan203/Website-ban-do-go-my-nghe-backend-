@@ -40,13 +40,22 @@ public class SecurityConfig {
                 // ✅ Public - không cần đăng nhập
                 //.requestMatchers(HttpMethod.POST, "/auth/login", "/auth/register", "/auth/introspect","/auth/verify-otp").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/products/**", "/categories/**","/auth/test-email").permitAll()
+                .requestMatchers("/uploads/**").permitAll()
+                .requestMatchers("doan/admin/dashboard/top-products").permitAll()
+                .requestMatchers(HttpMethod.POST, "/payment/checkout").permitAll()
+                .requestMatchers(HttpMethod.POST, "/payment/momo/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/payment/momo/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/payment/vnpay/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/payment/vnpay/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/search/**").permitAll()
 
+                .requestMatchers(HttpMethod.POST, "/admin/products/upload-image").permitAll()
+                .requestMatchers(HttpMethod.GET, "/products/**", "/categories/**", "/doan/products/**", "/doan/categories/**", "/auth/test-email").permitAll()
                 // ✅ Trang quản trị - cần ADMIN
                 .requestMatchers("/admin/**").hasRole(Role.ADMIN.name())
 
                 // ✅ Trang cá nhân người dùng
-                .requestMatchers("/user/**", "/orders/checkout","/orders/me","/payment/").hasAnyRole(Role.USER.name(), Role.ADMIN.name())
+                .requestMatchers("/user/**", "/orders/checkout","/orders/me").hasAnyRole(Role.USER.name(), Role.ADMIN.name())
 
                 // ✅ Mặc định: phải xác thực
                 .anyRequest().authenticated()
@@ -73,6 +82,8 @@ public class SecurityConfig {
         jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
         return jwtAuthenticationConverter;
     }
+
+
 
 
     @Bean

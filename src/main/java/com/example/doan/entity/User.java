@@ -1,15 +1,16 @@
 package com.example.doan.entity;
 
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 
 import java.util.Set;
-
+import java.util.List;
 
 @Entity
 @Data
@@ -17,6 +18,7 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Table(name = "user")
 @AllArgsConstructor
+@ToString(exclude = { "role", "cart", "comments", "orders" })
 public class User {
 
     @Id
@@ -37,11 +39,27 @@ public class User {
     private String phoneNumber;
     private String address;
 
-    @ManyToOne
+    @Column(name = "is_active")
+    private Boolean isActive = true;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id", nullable = false)
+    @JsonBackReference
     private Role role;
 
-    @Column(name = "is_verified")
+    @Column(name = "is_verified", nullable = false)
     private Boolean isVerified = false;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Comment> comments;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Order> orders;
+
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private Cart cart;
 
 }

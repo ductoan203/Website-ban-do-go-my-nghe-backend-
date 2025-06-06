@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Data
 @NoArgsConstructor
@@ -20,6 +22,6 @@ public class CartItem {
     @ManyToOne
     @JsonIgnore
     private Product product;
-
+    private BigDecimal price;
     private int quantity;
 }

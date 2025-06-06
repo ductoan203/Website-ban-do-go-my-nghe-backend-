@@ -22,11 +22,19 @@ public class AdminOrderController {
                 .build();
     }
 
-
     @PutMapping("/{id}/status")
     public ApiResponse<OrderResponse> updateStatus(@PathVariable Long id, @RequestParam Order.OrderStatus status) {
         return ApiResponse.<OrderResponse>builder()
                 .result(orderService.convertToDto(orderService.updateStatus(id, status)))
                 .build();
     }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<String> deleteOrder(@PathVariable Long id) {
+        orderService.deleteOrderById(id);
+        return ApiResponse.<String>builder()
+                .result("Xóa đơn hàng thành công")
+                .build();
+    }
+
 }

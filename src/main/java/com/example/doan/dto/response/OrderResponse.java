@@ -18,4 +18,6 @@ public class OrderResponse {
     private List<OrderItemResponse> items;
     private String paymentMethod;  // "COD" hoặc "ONLINE"
     private String paymentStatus;
-}
+    private String customerName;
+    private String email;
+    private String phone;}

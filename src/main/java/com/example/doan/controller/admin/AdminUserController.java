@@ -3,6 +3,7 @@ package com.example.doan.controller.admin;
 import com.example.doan.dto.request.ApiResponse;
 import com.example.doan.dto.request.UserCreateRequest;
 import com.example.doan.dto.request.UserUpdateRequest;
+import com.example.doan.dto.response.UserResponse;
 import com.example.doan.entity.User;
 import com.example.doan.service.UserService;
 import jakarta.validation.Valid;
@@ -17,7 +18,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/admin/user")
-//@PreAuthorize("hasRole('ADMIN')")
+// @PreAuthorize("hasRole('ADMIN')")
 public class AdminUserController {
 
     private final UserService userService;
@@ -27,11 +28,19 @@ public class AdminUserController {
         this.userService = userService;
     }
 
-
     @PostMapping
-    ApiResponse <User> createUser(@RequestBody @Valid UserCreateRequest request) {
+    ApiResponse<User> createUser(@RequestBody @Valid UserCreateRequest request) {
         return ApiResponse.<User>builder()
                 .result(userService.createUser(request))
+                .build();
+    }
+
+    @PostMapping("/customers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<UserResponse> createCustomer(@RequestBody @Valid UserCreateRequest request) {
+        User newUser = userService.createUser(request);
+        return ApiResponse.<UserResponse>builder()
+                .result(UserResponse.fromEntity(newUser))
                 .build();
     }
 
@@ -44,28 +53,40 @@ public class AdminUserController {
         });
 
         return ApiResponse.<List<User>>builder()
-                .result(userService.getAllUsers())
+                .result(userService.getAllUsers(null))
                 .build();
     }
 
+    @GetMapping("/customers")
+    public ApiResponse<List<UserResponse>> getAllCustomers(@RequestParam(required = false) String searchTerm) {
+        List<UserResponse> users = userService.getAllUsers(searchTerm)
+                .stream()
+                .filter(u -> u.getRole() != null && "USER".equalsIgnoreCase(u.getRole().getName()))
+                .map(UserResponse::fromEntity)
+                .toList();
+
+        return ApiResponse.<List<UserResponse>>builder()
+                .result(users)
+                .build();
+    }
 
     @GetMapping("/{userId}")
     public ApiResponse<User> getUserById(@PathVariable Long userId) {
-       return ApiResponse.<User>builder()
+        return ApiResponse.<User>builder()
                 .result(userService.getUserById(userId))
                 .build();
     }
 
-//    @GetMapping("/myInfo")
-//    ApiResponse<UserResponse> getMyInfo() {
-//       return ApiResponse.<UserResponse>builder()
-//                .result(userService.getMyInfo())
-//                .build();
-//    }
+    // @GetMapping("/myInfo")
+    // ApiResponse<UserResponse> getMyInfo() {
+    // return ApiResponse.<UserResponse>builder()
+    // .result(userService.getMyInfo())
+    // .build();
+    // }
 
     @PutMapping("/{userId}")
     public ApiResponse<User> updateUser(@PathVariable Long userId, @RequestBody UserUpdateRequest request) {
-       return ApiResponse.<User>builder()
+        return ApiResponse.<User>builder()
                 .result(userService.updateUserByAdmin(userId, request))
                 .build();
     }

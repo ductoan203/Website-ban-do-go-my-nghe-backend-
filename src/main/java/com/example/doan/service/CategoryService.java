@@ -27,8 +27,13 @@ public class CategoryService {
         return categoryRepository.save(category);
     }
 
-    public List<Category> getAll() {
-        return categoryRepository.findAll();
+    public List<Category> getAll(String searchTerm) {
+        if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+            return categoryRepository.findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm,
+                    searchTerm);
+        } else {
+            return categoryRepository.findAll();
+        }
     }
 
     public void delete(Long id) {
@@ -39,5 +44,21 @@ public class CategoryService {
             throw new AppException(ErrorCode.CATEGORY_DELETE_FAILED);
         }
         categoryRepository.deleteById(id);
+    }
+
+    public Category update(Long id, CategoryRequest request) {
+        Category existingCategory = categoryRepository.findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.CATEGOTY_NOT_FOUND));
+
+        // Kiểm tra tên danh mục trùng lặp, bỏ qua danh mục hiện tại
+        if (categoryRepository.findByName(request.getName()).isPresent() &&
+                !existingCategory.getName().equals(request.getName())) {
+            throw new AppException(ErrorCode.INVALID_CATEGORY_NAME);
+        }
+
+        existingCategory.setName(request.getName());
+        existingCategory.setDescription(request.getDescription());
+
+        return categoryRepository.save(existingCategory);
     }
 }

@@ -2,6 +2,7 @@ package com.example.doan.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@ToString(exclude = "user")
 public class Cart {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

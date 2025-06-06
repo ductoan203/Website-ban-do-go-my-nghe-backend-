@@ -15,31 +15,47 @@ import java.util.List;
 @AllArgsConstructor
 @Table(name = "orders")
 public class Order {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    private User user;
+    @Column(name = "customer_name")
+    private String customerName;
 
+    private String email;
+
+    private String phone;
+
+    @Column(name = "shipping_address")
     private String shippingAddress;
+
+    @Column(name = "payment_method")
+    private String paymentMethod;
+
+    @Column(name = "payment_status")
+    private String paymentStatus;
+
+    private BigDecimal total;
+
+    @Column(name = "created_at")
+    private Instant createdAt;
 
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
 
-    private BigDecimal total;
-
-    private Instant createdAt;
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
     private List<OrderItem> items;
 
-    private String cancelledBy; // có thể là "USER", "ADMIN"
+    @Column(name = "cancelled_by")
+    private String cancelledBy;
 
     public enum OrderStatus {
-        PENDING, CONFIRMED, SHIPPED, CANCELLED
+        PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
     }
-    private String paymentMethod;  // "COD" hoặc "ONLINE"
-    private String paymentStatus;  // "PAID", "UNPAID", "FAILED"
-
 }
+

@@ -8,4 +8,5 @@ import lombok.*;
 @NoArgsConstructor
 public class IntrospectRespone {
     private boolean valid;
+    private String role;
 }

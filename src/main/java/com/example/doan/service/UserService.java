@@ -23,6 +23,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -43,42 +44,47 @@ public class UserService {
     private final OtpTokenRepository otpTokenRepository;
     private final OtpService otpService;
 
-
     public User createUser(UserCreateRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new RuntimeException("Username already exists!");
-        }
+        // Kiểm tra email đã tồn tại
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorCode.EMAIL_EXISTS);
         }
 
+        // Lấy role USER
         Role userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new RuntimeException("Role USER not found"));
+                .orElseThrow(() -> new AppException(ErrorCode.ROLE_NOT_FOUND));
 
+        // Tạo user mới
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .fullname(request.getFullname())
+                .phoneNumber(request.getPhoneNumber())
+                .address(request.getAddress())
+                .role(userRole)
+                .isActive(true)
+                .isVerified(false)
+                .build();
 
-        User user = new User();
-//        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setUsername(request.getUsername());
-        user.setEmail(request.getEmail());
-        //user.setPassword(request.getPassword());
-        user.setFullname(request.getFullname());
-        user.setPhoneNumber(request.getPhoneNumber());
-        user.setAddress(request.getAddress());
-        user.setRole(userRole);
-
-
+        // Lưu user
         User savedUser = userRepository.save(user);
+
+        // Gửi OTP xác minh
         otpService.sendOtpToUser(savedUser);
 
         return savedUser;
     }
 
-
     @PreAuthorize("hasRole('ADMIN')")
-    public List<User> getAllUsers() {
-        log.info("In method get Users") ;
-        return userRepository.findAll();
+    public List<User> getAllUsers(@RequestParam(required = false) String searchTerm) {
+        log.info("In method get Users with searchTerm: {}", searchTerm);
+        if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+            // Nếu có searchTerm, gọi phương thức tìm kiếm mới
+            return userRepository.findByFullnameOrEmailOrPhoneNumberContainingIgnoreCase(searchTerm);
+        } else {
+            // Nếu không có searchTerm, trả về tất cả người dùng
+            return userRepository.findAll();
+        }
     }
 
     @PreAuthorize("returnObject.username == authentication.name")
@@ -87,37 +93,26 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found!"));
     }
 
+    public UserResponse getMyInfo() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
-    public UserResponse getMyInfo(){
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        User user = userRepository.findByUsername(username).orElseThrow(
-                () -> new RuntimeException("User not found")
-        );
-
-        return UserResponse.builder()
-                .userId(user.getUserId())
-                .username(user.getUsername())
-                .password(user.getPassword())
-                .email(user.getEmail())
-                .fullname(user.getFullname())
-                .phoneNumber(user.getPhoneNumber())
-                .address(user.getAddress())
-                //.role(user.getRole().getName())
-                .build();
+        return UserResponse.fromEntity(user);
     }
 
-    @PreAuthorize("hasRole('ADMN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public User updateUserByAdmin(Long userId, UserUpdateRequest request) {
         User user = getUserById(userId);
         return updateUserFields(user, request);
     }
 
-    //  USER chỉ được sửa chính mình
+    // USER chỉ được sửa chính mình
     public User updateMyInfo(UserUpdateRequest request) {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
         return updateUserFields(user, request);
@@ -134,7 +129,6 @@ public class UserService {
         return userRepository.save(user);
     }
 
-
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
     public void deleteUser(Long userId) {
@@ -143,7 +137,5 @@ public class UserService {
         userRepository.delete(user);
         log.info("Deleted user with ID: {}", userId);
     }
-
-
 
 }

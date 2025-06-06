@@ -2,12 +2,16 @@ package com.example.doan.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-
-
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class UserCreateRequest {
-    @Size(min = 5, max = 20, message = "Username must be between 5 and 20 characters")
-    private String username;
+//    @Size(min = 5, max = 20, message = "Username must be between 5 and 20 characters")
+//    private String username;
     @Size(min = 8, message = "Password must be at least 8 characters long")
     private String password;
     @Email(regexp = "^[A-Za-z0-9._%+-]+@gmail\\.com$", message = "Email should be a valid Gmail address")
@@ -16,13 +20,6 @@ public class UserCreateRequest {
     private String phoneNumber;
     private String address;
 
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
 
     public String getPassword() {
         return password;

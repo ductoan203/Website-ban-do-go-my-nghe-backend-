@@ -20,7 +20,7 @@ public class CategoryController {
     @GetMapping
     public ApiResponse<List<Category>> getAllPublicCategories() {
         return ApiResponse.<List<Category>>builder()
-                .result(categoryService.getAll())
+                .result(categoryService.getAll(null))
                 .build();
     }
 }

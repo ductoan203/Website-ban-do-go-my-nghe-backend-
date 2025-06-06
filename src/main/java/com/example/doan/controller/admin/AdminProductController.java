@@ -7,7 +7,13 @@ import com.example.doan.service.ProductService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 @RestController
@@ -23,11 +29,28 @@ public class AdminProductController {
                 .build();
     }
 
+    @PostMapping("/upload-image")
+    public ApiResponse<String> uploadImage(@RequestParam("image") MultipartFile file) {
+        try {
+            String filename = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+            Path uploadPath = Paths.get("uploads/" + filename);
+            Files.createDirectories(uploadPath.getParent()); // nếu chưa có thư mục
+            Files.copy(file.getInputStream(), uploadPath, StandardCopyOption.REPLACE_EXISTING);
+
+            String imageUrl = "/uploads/" + filename;
+            return ApiResponse.<String>builder()
+                    .result(imageUrl)
+                    .build();
+        } catch (IOException e) {
+            throw new RuntimeException("Upload thất bại: " + e.getMessage());
+        }
+    }
+
     // ✅ Lấy toàn bộ sản phẩm cho admin
     @GetMapping
     public ApiResponse<List<Product>> getAllForAdmin() {
         return ApiResponse.<List<Product>>builder()
-                .result(productService.getAll())
+                .result(productService.getAllProductsForAdmin())
                 .build();
     }
 

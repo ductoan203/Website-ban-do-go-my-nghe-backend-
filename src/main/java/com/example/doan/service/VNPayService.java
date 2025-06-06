@@ -1,0 +1,125 @@
+package com.example.doan.service;
+
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Getter
+@Setter
+@RequiredArgsConstructor
+@AllArgsConstructor
+@Service
+public class VNPayService {
+
+    private static final Logger log = LoggerFactory.getLogger(VNPayService.class);
+
+    @Value("${vnpay.tmn-code}")
+    private String vnpTmnCode;
+
+    @Value("${vnpay.hash-secret}")
+    private String vnpHashSecret;
+
+    @Value("${vnpay.pay-url}")
+    private String vnpPayUrl;
+
+    @Value("${vnpay.return-url}")
+    private String vnpReturnUrl;
+
+    public String createPaymentUrl(HttpServletRequest request, long amount, String orderId) {
+        try {
+            String vnp_IpAddr = getIpAddress(request);
+            String vnp_CreateDate = getCurrentDate();
+
+            Map<String, String> vnp_Params = new LinkedHashMap<>();
+            vnp_Params.put("vnp_Version", "2.1.0");
+            vnp_Params.put("vnp_Command", "pay");
+            vnp_Params.put("vnp_TmnCode", vnpTmnCode);
+            vnp_Params.put("vnp_Amount", String.valueOf(amount * 100));
+            vnp_Params.put("vnp_CurrCode", "VND");
+            vnp_Params.put("vnp_TxnRef", orderId);
+            vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang: " + orderId);
+            vnp_Params.put("vnp_OrderType", "other");
+            vnp_Params.put("vnp_Locale", "vn");
+            vnp_Params.put("vnp_ReturnUrl", vnpReturnUrl);
+            vnp_Params.put("vnp_IpAddr", "127.0.0.1");
+            vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
+
+            List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
+            Collections.sort(fieldNames);
+            StringBuilder hashData = new StringBuilder();
+            StringBuilder query = new StringBuilder();
+            for (String fieldName : fieldNames) {
+                String value = vnp_Params.get(fieldName);
+                if (value != null && !value.isEmpty()) {
+                    hashData.append(fieldName).append('=').append(value).append('&');
+                    query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII)).append('=')
+                            .append(URLEncoder.encode(value, StandardCharsets.US_ASCII)).append('&');
+                }
+            }
+            if (!hashData.isEmpty())
+                hashData.setLength(hashData.length() - 1);
+            if (!query.isEmpty())
+                query.setLength(query.length() - 1);
+
+            // Log hashData để debug
+            log.info("🌐 [VNPAY] HashData: {}", hashData.toString());
+
+            String secureHash = hmacSHA512(vnpHashSecret, hashData.toString());
+            query.append("&vnp_SecureHash=").append(secureHash);
+
+            return vnpPayUrl + "?" + query.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("Cannot create VNPAY URL", e);
+        }
+    }
+
+    private String getCurrentDate() {
+        return new SimpleDateFormat("yyyyMMddHHmmss").format(new Date());
+    }
+
+    private String getIpAddress(HttpServletRequest request) {
+        String ipAddress = request.getHeader("X-FORWARDED-FOR");
+        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+            ipAddress = request.getRemoteAddr();
+        }
+        // Có thể X-FORWARDED-FOR chứa nhiều IP, lấy cái đầu tiên
+        if (ipAddress != null && ipAddress.contains(",")) {
+            ipAddress = ipAddress.split(",")[0];
+        }
+        return ipAddress;
+    }
+
+    public static String hmacSHA512(String key, String data) throws Exception {
+        Mac hmac512 = Mac.getInstance("HmacSHA512");
+        SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA512");
+        hmac512.init(secretKey);
+        byte[] bytes = hmac512.doFinal(data.getBytes(StandardCharsets.UTF_8));
+        StringBuilder hash = new StringBuilder();
+        for (byte b : bytes) {
+            String hex = Integer.toHexString(0xff & b);
+            if (hex.length() == 1)
+                hash.append('0');
+            hash.append(hex);
+        }
+        return hash.toString().toUpperCase();
+    }
+
+    public String getHashSecret() {
+        return this.vnpHashSecret;
+    }
+}
