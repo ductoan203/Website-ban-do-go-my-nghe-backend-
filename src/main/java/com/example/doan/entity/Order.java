@@ -55,7 +55,6 @@ public class Order {
     private String cancelledBy;
 
     public enum OrderStatus {
-        PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
+        PENDING, CONFIRMED, READY_FOR_DELIVERY, SHIPPED, DELIVERED, CANCELLED, RETURNED
     }
 }
-

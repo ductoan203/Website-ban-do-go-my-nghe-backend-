@@ -16,8 +16,10 @@ public class OrderResponse {
     private BigDecimal total;
     private Instant createdAt;
     private List<OrderItemResponse> items;
-    private String paymentMethod;  // "COD" hoặc "ONLINE"
+    private String paymentMethod; // "COD" hoặc "ONLINE"
     private String paymentStatus;
     private String customerName;
     private String email;
-    private String phone;}
+    private String phone;
+    private String cancelledBy;
+}

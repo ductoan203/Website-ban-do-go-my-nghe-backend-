@@ -2,6 +2,7 @@ package com.example.doan.controller.admin;
 
 import com.example.doan.dto.request.ApiResponse;
 import com.example.doan.dto.request.ProductRequest;
+import com.example.doan.dto.response.ProductResponse;
 import com.example.doan.entity.Product;
 import com.example.doan.service.ProductService;
 import jakarta.validation.Valid;
@@ -46,18 +47,18 @@ public class AdminProductController {
         }
     }
 
-    // ✅ Lấy toàn bộ sản phẩm cho admin
+    // Lấy toàn bộ sản phẩm cho admin
     @GetMapping
-    public ApiResponse<List<Product>> getAllForAdmin() {
-        return ApiResponse.<List<Product>>builder()
+    public ApiResponse<List<ProductResponse>> getAllForAdmin() {
+        return ApiResponse.<List<ProductResponse>>builder()
                 .result(productService.getAllProductsForAdmin())
                 .build();
     }
 
-    // ✅ Lấy sản phẩm theo id cho admin
+    // Lấy sản phẩm theo id cho admin
     @GetMapping("/{id}")
-    public ApiResponse<Product> getById(@PathVariable Long id) {
-        return ApiResponse.<Product>builder()
+    public ApiResponse<ProductResponse> getById(@PathVariable Long id) {
+        return ApiResponse.<ProductResponse>builder()
                 .result(productService.getById(id))
                 .build();
     }

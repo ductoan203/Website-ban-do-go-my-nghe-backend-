@@ -60,4 +60,14 @@ public class OrderController {
                 .build();
     }
 
+    @PutMapping("/return/{id}")
+    public ApiResponse<OrderResponse> returnOrder(@PathVariable Long id) {
+        // Logic kiểm tra quyền truy cập: đảm bảo chỉ người dùng sở hữu đơn hàng mới
+        // được trả hàng
+        // OrderService.returnOrder sẽ tự kiểm tra trạng thái hợp lệ
+        return ApiResponse.<OrderResponse>builder()
+                .result(orderService.convertToDto(orderService.returnOrder(id)))
+                .build();
+    }
+
 }

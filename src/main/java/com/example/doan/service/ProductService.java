@@ -1,6 +1,9 @@
 package com.example.doan.service;
 
 import com.example.doan.dto.request.ProductRequest;
+import com.example.doan.dto.response.CategoryResponse;
+import com.example.doan.dto.response.ProductImageResponse;
+import com.example.doan.dto.response.ProductResponse;
 import com.example.doan.entity.Category;
 import com.example.doan.entity.Product;
 import com.example.doan.entity.ProductImage;
@@ -17,6 +20,7 @@ import com.example.doan.repository.ProductRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
@@ -101,44 +105,41 @@ public class ProductService {
         productRepository.deleteById(id);
     }
 
-    public List<Product> getAll() {
-        // This method is likely for admin, should eager load category and images
-        // It currently uses the default findAll() which might not eager load everything
-        // Let's create a dedicated method for admin.
-        return productRepository.findAll();
+    public List<ProductResponse> getAll() {
+        return productRepository.findAll().stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
     }
 
-    // New method for admin to get all products with eager loaded category and
-    // images
-    public List<Product> getAllProductsForAdmin() {
-        // Call the overridden findAll() method in ProductRepository which has the
-        // EntityGraph for category and images
-        return productRepository.findAll();
+    public List<ProductResponse> getAllProductsForAdmin() {
+        return productRepository.findAll().stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
     }
 
-    public Page<Product> searchProducts(String keyword, Long categoryId, Pageable pageable) {
-        // If both keyword and categoryId are null or empty, return all products
-        // paginated with Category eagerly fetched
+    public Page<ProductResponse> searchProducts(String keyword, Long categoryId, Pageable pageable) {
+        Page<Product> productPage;
         if ((keyword == null || keyword.trim().isEmpty()) && categoryId == null) {
-            return productRepository.findAll(pageable); // Use the overridden findAll with EntityGraph
-        }
-
-        if (categoryId != null) {
-            // Search by keyword within a specific category
-            // Need to handle the case where keyword is null when categoryId is not
+            productPage = productRepository.findAll(pageable);
+        } else if (categoryId != null) {
             if (keyword == null || keyword.trim().isEmpty()) {
-                return productRepository.findByCategoryId(categoryId, pageable); // Assuming findByCategoryId method
-                // exists
+                productPage = productRepository.findByCategoryId(categoryId, pageable);
             } else {
-                return productRepository.findByNameContainingIgnoreCaseAndCategoryId(keyword, categoryId, pageable);
+                productPage = productRepository.findByNameContainingIgnoreCaseAndCategoryId(keyword, categoryId,
+                        pageable);
             }
         } else { // categoryId is null, but keyword is not null/empty
-            return productRepository.findByNameContainingIgnoreCase(keyword, pageable); // Search by keyword across all
-            // categories
+            productPage = productRepository.findByNameContainingIgnoreCase(keyword, pageable);
         }
+
+        List<ProductResponse> dtoList = productPage.getContent().stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(dtoList, pageable, productPage.getTotalElements());
     }
 
-    public List<Product> getTopSellingProducts(int topN) {
+    public List<ProductResponse> getTopSellingProducts(int topN) {
         List<OrderItem> allItems = orderItemRepository.findAll();
         Map<Product, Integer> productSales = new HashMap<>();
         for (OrderItem item : allItems) {
@@ -148,10 +149,60 @@ public class ProductService {
                 .sorted(Map.Entry.<Product, Integer>comparingByValue().reversed())
                 .limit(topN)
                 .map(Map.Entry::getKey)
+                .map(this::convertToDto) // Convert to DTO here
                 .collect(Collectors.toList());
     }
 
-    public Product getById(Long id) {
-        return productRepository.findById(id).orElseThrow(() -> new RuntimeException("Product not found"));
+    public ProductResponse getById(Long id) {
+        Product product = productRepository.findById(id).orElseThrow(() -> new RuntimeException("Product not found"));
+        return convertToDto(product);
+    }
+
+    private CategoryResponse convertCategoryToDto(Category category) {
+        if (category == null) {
+            return null;
+        }
+        return CategoryResponse.builder()
+                .id(category.getId())
+                .name(category.getName())
+                .description(category.getDescription())
+                .build();
+    }
+
+    private ProductImageResponse convertImageToDto(ProductImage image) {
+        if (image == null) {
+            return null;
+        }
+        return ProductImageResponse.builder()
+                .id(image.getId())
+                .imageUrl(image.getImageUrl())
+                .build();
+    }
+
+    private ProductResponse convertToDto(Product product) {
+        if (product == null) {
+            return null;
+        }
+
+        List<ProductImageResponse> imageResponses = product.getImages().stream()
+                .map(this::convertImageToDto)
+                .collect(Collectors.toList());
+
+        return ProductResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .slug(product.getSlug())
+                .description(product.getDescription())
+                .price(product.getPrice())
+                .discountPrice(product.getDiscountPrice())
+                .thumbnailUrl(product.getThumbnailUrl())
+                .material(product.getMaterial())
+                .dimensions(product.getDimensions())
+                .quantityInStock(product.getQuantityInStock())
+                .category(convertCategoryToDto(product.getCategory()))
+                .images(imageResponses)
+                .createdAt(product.getCreatedAt())
+                .updatedAt(product.getUpdatedAt())
+                .build();
     }
 }

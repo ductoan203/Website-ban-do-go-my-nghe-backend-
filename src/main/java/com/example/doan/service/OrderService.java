@@ -9,6 +9,7 @@ import com.example.doan.exception.ErrorCode;
 import com.example.doan.repository.OrderItemRepository;
 import com.example.doan.repository.OrderRepository;
 import com.example.doan.repository.UserRepository;
+import com.example.doan.repository.ProductRepository;
 import com.example.doan.util.SecurityUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final CartService cartService;
     private final UserRepository userRepository;
+    private final ProductRepository productRepository;
     private static final Logger log = LoggerFactory.getLogger(OrderService.class);
 
     public Order findByOrderId(String orderId) {
@@ -72,6 +74,8 @@ public class OrderService {
         order.setCustomerName(request.getCustomerName());
         order.setEmail(request.getEmail());
         order.setPhone(request.getPhone());
+        order.setPaymentMethod(request.getPaymentMethod());
+        order.setPaymentStatus(request.getPaymentStatus());
 
         List<OrderItem> orderItems = cart.getItems().stream().map(cartItem -> {
             Product product = cartItem.getProduct();
@@ -130,6 +134,7 @@ public class OrderService {
                 .customerName(order.getUser() != null ? order.getUser().getFullname() : order.getCustomerName())
                 .email(order.getEmail())
                 .phone(order.getPhone())
+                .cancelledBy(order.getCancelledBy())
                 .createdAt(order.getCreatedAt())
                 .paymentMethod(order.getPaymentMethod())
                 .paymentStatus(order.getPaymentStatus())
@@ -142,22 +147,81 @@ public class OrderService {
     }
 
     @Transactional
-    public Order updateStatus(Long id, Order.OrderStatus status) {
+    public Order updateStatus(Long id, Order.OrderStatus newStatus) {
+        log.info("[ORDER_STATUS] Bắt đầu cập nhật trạng thái đơn hàng. Order ID: {}, Trạng thái mới: {}", id,
+                newStatus);
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+                .orElseThrow(() -> {
+                    log.warn("[ORDER_STATUS] Không tìm thấy đơn hàng với ID: {}", id);
+                    return new AppException(ErrorCode.ORDER_NOT_FOUND);
+                });
 
-        // Nếu đơn đã bị huỷ và người huỷ là USER thì admin không được chỉnh sửa nữa
-        if ("USER".equals(order.getCancelledBy()) && order.getStatus() == Order.OrderStatus.CANCELLED) {
-            throw new AppException(ErrorCode.ORDER_CANCELED_BY_USER);
+        // Lấy trạng thái hiện tại của đơn hàng
+        Order.OrderStatus currentStatus = order.getStatus();
+        String cancelledBy = order.getCancelledBy(); // Lấy thông tin người hủy
+        log.info("[ORDER_STATUS] Trạng thái hiện tại của đơn hàng ID {}: {}, Người hủy: {}", id, currentStatus,
+                cancelledBy);
+
+        // Kiểm tra xem chuyển đổi trạng thái có hợp lệ không, truyền thêm thông tin
+        // người hủy
+        if (!isValidStatusTransition(currentStatus, newStatus, cancelledBy)) {
+            log.warn("[ORDER_STATUS] Chuyển đổi trạng thái không hợp lệ: Từ {} sang {}. Người hủy: {}. Order ID: {}",
+                    currentStatus, newStatus, cancelledBy, id);
+            throw new AppException(ErrorCode.INVALID_ORDER_STATUS_TRANSITION);
         }
 
-        order.setStatus(status);
-        if (status == Order.OrderStatus.CANCELLED) {
-            order.setCancelledBy("ADMIN");
-        } else {
-            order.setCancelledBy(null);
+        order.setStatus(newStatus);
+
+        // Cập nhật trường cancelledBy khi chuyển trạng thái thành CANCELLED
+        if (newStatus == Order.OrderStatus.CANCELLED) {
+            // Nếu trạng thái mới là CANCELLED và đơn hàng chưa bị USER hủy
+            if (!"USER".equals(order.getCancelledBy())) {
+                order.setCancelledBy("ADMIN");
+            }
+        } else if (currentStatus == Order.OrderStatus.CANCELLED && !newStatus.equals(Order.OrderStatus.CANCELLED)) {
+            // Nếu trạng thái cũ là CANCELLED và trạng thái mới không phải CANCELLED (tức là
+            // hoàn tác)
+            order.setCancelledBy(null); // Xóa người hủy khi hoàn tác
         }
-        return orderRepository.save(order);
+
+        Order updatedOrder = orderRepository.save(order);
+        log.info("[ORDER_STATUS] Cập nhật trạng thái đơn hàng thành công. Order ID: {}, Trạng thái mới: {}", id,
+                updatedOrder.getStatus());
+        return updatedOrder;
+    }
+
+    private boolean isValidStatusTransition(Order.OrderStatus currentStatus, Order.OrderStatus newStatus,
+                                            String cancelledBy) {
+        log.info("[ORDER_STATUS_TRANSITION] Kiểm tra chuyển đổi từ {} sang {}. Người hủy (nếu có): {}", currentStatus,
+                newStatus, cancelledBy);
+        // Nếu đơn hàng đang ở trạng thái CANCELLED hoặc RETURNED
+        if (currentStatus == Order.OrderStatus.CANCELLED || currentStatus == Order.OrderStatus.RETURNED) {
+            // Admin có thể hoàn tác đơn hàng nếu nó bị hủy bởi ADMIN
+            if (currentStatus == Order.OrderStatus.CANCELLED && "ADMIN".equals(cancelledBy)) {
+                // Admin có thể chuyển từ CANCELLED trở lại PENDING hoặc CONFIRMED
+                return newStatus == Order.OrderStatus.PENDING || newStatus == Order.OrderStatus.CONFIRMED;
+            }
+            log.info("[ORDER_STATUS_TRANSITION] Không thể chuyển đổi từ trạng thái cuối hoặc bị hủy bởi USER: {}",
+                    currentStatus);
+            return false; // Không thể chuyển đổi từ các trạng thái cuối này (hoặc nếu bị user hủy)
+        }
+
+        switch (currentStatus) {
+            case PENDING:
+                return newStatus == Order.OrderStatus.CONFIRMED || newStatus == Order.OrderStatus.CANCELLED;
+            case CONFIRMED:
+                return newStatus == Order.OrderStatus.READY_FOR_DELIVERY || newStatus == Order.OrderStatus.CANCELLED;
+            case READY_FOR_DELIVERY:
+                return newStatus == Order.OrderStatus.SHIPPED || newStatus == Order.OrderStatus.CANCELLED;
+            case SHIPPED:
+                return newStatus == Order.OrderStatus.DELIVERED || newStatus == Order.OrderStatus.RETURNED
+                        || newStatus == Order.OrderStatus.CANCELLED;
+            case DELIVERED:
+                return newStatus == Order.OrderStatus.RETURNED; // Có thể trả hàng sau khi đã giao
+            default:
+                log.warn("[ORDER_STATUS_TRANSITION] Trạng thái hiện tại không xác định: {}", currentStatus);
+                return false;
+        }
     }
 
     @Transactional
@@ -176,14 +240,50 @@ public class OrderService {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
 
-        // Chỉ cho phép hủy nếu trạng thái chưa phải ĐÃ GIAO, ĐÃ HỦY hoặc ĐANG GIAO
-        if (order.getStatus() == Order.OrderStatus.DELIVERED || order.getStatus() == Order.OrderStatus.CANCELLED
-                || order.getStatus() == Order.OrderStatus.SHIPPED) {
+        // Chỉ cho phép hủy nếu trạng thái chưa phải ĐÃ GIAO, ĐÃ HỦY hoặc ĐANG GIAO HOẶC
+        // ĐÃ TRẢ HÀNG
+        if (order.getStatus() == Order.OrderStatus.DELIVERED
+                || order.getStatus() == Order.OrderStatus.CANCELLED
+                || order.getStatus() == Order.OrderStatus.SHIPPED
+                || order.getStatus() == Order.OrderStatus.RETURNED) {
             throw new AppException(ErrorCode.ORDER_CANCEL_FAILED); // hoặc một mã lỗi phù hợp hơn
         }
 
         order.setStatus(Order.OrderStatus.CANCELLED);
         order.setCancelledBy("USER");
+
+        // Hoàn trả tồn kho cho các sản phẩm trong đơn hàng bị hủy
+        for (OrderItem item : order.getItems()) {
+            Product product = item.getProduct();
+            product.setQuantityInStock(product.getQuantityInStock() + item.getQuantity());
+            productRepository.save(product);
+            log.info("[ORDER] Đã hoàn trả tồn kho cho sản phẩm {} (id: {}). Tồn kho mới: {}", product.getName(),
+                    product.getId(), product.getQuantityInStock());
+        }
+
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public Order returnOrder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        // Chỉ cho phép trả hàng nếu trạng thái là ĐÃ GIAO
+        if (order.getStatus() != Order.OrderStatus.DELIVERED) {
+            throw new AppException(ErrorCode.INVALID_ORDER_STATUS_TRANSITION); // Sử dụng lỗi chung hoặc tạo lỗi mới
+        }
+
+        order.setStatus(Order.OrderStatus.RETURNED);
+
+        // Hoàn trả tồn kho cho các sản phẩm trong đơn hàng được trả
+        for (OrderItem item : order.getItems()) {
+            Product product = item.getProduct();
+            product.setQuantityInStock(product.getQuantityInStock() + item.getQuantity());
+            productRepository.save(product);
+            log.info("[ORDER] Đã hoàn trả tồn kho cho sản phẩm {} (id: {}). Tồn kho mới: {}", product.getName(),
+                    product.getId(), product.getQuantityInStock());
+        }
         return orderRepository.save(order);
     }
 
@@ -203,6 +303,7 @@ public class OrderService {
         List<Order> orders = (status != null)
                 ? orderRepository.findByUserAndStatus(user, status)
                 : orderRepository.findByUser(user);
+        log.info("[OrderService] Retrieved {} orders for user: {}", orders.size(), username);
         return orders.stream().map(this::convertToDto).toList();
     }
 
@@ -220,6 +321,23 @@ public class OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
         orderRepository.delete(order);
+    }
+
+    @Transactional
+    public void deductStock(Order order) {
+        for (OrderItem item : order.getItems()) {
+            Product product = item.getProduct();
+            int newQuantityInStock = product.getQuantityInStock() - item.getQuantity();
+            if (newQuantityInStock < 0) {
+                log.warn("[ORDER] Tồn kho âm cho sản phẩm {} (id: {}). New stock: {}", product.getName(),
+                        product.getId(), newQuantityInStock);
+                newQuantityInStock = 0; // Đảm bảo tồn kho không âm
+            }
+            product.setQuantityInStock(newQuantityInStock);
+            productRepository.save(product);
+            log.info("[ORDER] Đã trừ tồn kho cho sản phẩm {} (id: {}). Tồn kho mới: {}", product.getName(),
+                    product.getId(), newQuantityInStock);
+        }
     }
 
 }

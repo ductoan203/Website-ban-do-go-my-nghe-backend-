@@ -11,5 +11,6 @@ public class OrderRequest {
     private String phone;
     private String shippingAddress;
     private String paymentMethod;
+    private String paymentStatus;
     private List<CartItemRequest> items;
 }

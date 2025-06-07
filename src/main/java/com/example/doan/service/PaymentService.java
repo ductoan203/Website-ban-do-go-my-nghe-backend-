@@ -110,6 +110,7 @@ public class PaymentService {
         if ("COD".equalsIgnoreCase(request.getPaymentMethod())) {
             order.setStatus(Order.OrderStatus.CONFIRMED);
             order.setPaymentStatus("UNPAID");
+            order.setPaymentMethod("COD");
             Order savedOrder = orderRepository.save(order);
 
             // Trừ số lượng tồn kho cho từng sản phẩm trong đơn hàng
@@ -150,25 +151,11 @@ public class PaymentService {
             return savedOrder;
         } else {
             order.setStatus(Order.OrderStatus.PENDING);
-            order.setPaymentStatus("UNPAID");
+            order.setPaymentStatus("PENDING");
+            order.setPaymentMethod(request.getPaymentMethod());
         }
 
         Order savedOrder = orderRepository.save(order);
-
-        // Trừ số lượng tồn kho cho từng sản phẩm trong đơn hàng
-        for (OrderItem item : savedOrder.getItems()) {
-            Product product = item.getProduct();
-            int newQuantityInStock = product.getQuantityInStock() - item.getQuantity();
-            if (newQuantityInStock < 0) {
-                logger.warn("[PAYMENT] Tồn kho âm cho sản phẩm {} (id: {}). New stock: {}", product.getName(),
-                        product.getId(), newQuantityInStock);
-                newQuantityInStock = 0; // Đảm bảo tồn kho không âm
-            }
-            product.setQuantityInStock(newQuantityInStock);
-            productRepository.save(product); // Lưu lại thông tin sản phẩm với tồn kho mới
-            logger.info("[PAYMENT] Đã trừ tồn kho cho sản phẩm {} (id: {}). Tồn kho mới: {}", product.getName(),
-                    product.getId(), newQuantityInStock);
-        }
 
         logger.info("[PAYMENT] orderId: {}, userId trong order: {}", savedOrder.getId(),
                 savedOrder.getUser() != null ? savedOrder.getUser().getUserId() : null);

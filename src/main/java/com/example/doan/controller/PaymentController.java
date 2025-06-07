@@ -140,6 +140,7 @@ public class PaymentController {
             order.setPaymentStatus("PAID");
             order.setStatus(Order.OrderStatus.CONFIRMED);
             orderService.save(order);
+            orderService.deductStock(order);
 
             // Gửi email xác nhận sau khi thanh toán Momo thành công
             emailService.send(
@@ -178,6 +179,7 @@ public class PaymentController {
                     order.setPaymentStatus("PAID");
                     order.setStatus(Order.OrderStatus.CONFIRMED);
                     orderService.save(order);
+                    orderService.deductStock(order);
                     // Gửi email xác nhận sau khi thanh toán Momo thành công
                     emailService.send(
                             order.getEmail(),
@@ -244,6 +246,7 @@ public class PaymentController {
             order.setPaymentStatus("PAID");
             order.setStatus(Order.OrderStatus.CONFIRMED);
             orderService.save(order);
+            orderService.deductStock(order);
 
             return ResponseEntity.ok("IPN_RECEIVED");
 
@@ -296,6 +299,7 @@ public class PaymentController {
             order.setPaymentStatus("PAID");
             order.setStatus(Order.OrderStatus.CONFIRMED);
             orderService.save(order);
+            orderService.deductStock(order);
 
             emailService.send(
                     order.getEmail(),

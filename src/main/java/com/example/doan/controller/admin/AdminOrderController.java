@@ -37,4 +37,11 @@ public class AdminOrderController {
                 .build();
     }
 
+    @PutMapping("/{id}/return")
+    public ApiResponse<OrderResponse> returnOrder(@PathVariable Long id) {
+        return ApiResponse.<OrderResponse>builder()
+                .result(orderService.convertToDto(orderService.returnOrder(id)))
+                .build();
+    }
+
 }

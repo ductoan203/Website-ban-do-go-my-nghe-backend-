@@ -8,6 +8,8 @@ import com.example.doan.repository.CategoryRepository;
 import com.example.doan.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -16,6 +18,7 @@ import java.util.List;
 public class CategoryService {
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
+    private static final Logger logger = LoggerFactory.getLogger(CategoryService.class);
 
     public Category create(CategoryRequest request) {
         if (categoryRepository.findByName(request.getName()).isPresent()) {
@@ -28,12 +31,15 @@ public class CategoryService {
     }
 
     public List<Category> getAll(String searchTerm) {
+        List<Category> categories;
         if (searchTerm != null && !searchTerm.trim().isEmpty()) {
-            return categoryRepository.findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm,
+            categories = categoryRepository.findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm,
                     searchTerm);
         } else {
-            return categoryRepository.findAll();
+            categories = categoryRepository.findAll();
         }
+        logger.info("Fetched categories: {}", categories);
+        return categories;
     }
 
     public void delete(Long id) {
