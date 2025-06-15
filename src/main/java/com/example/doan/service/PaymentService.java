@@ -136,11 +136,13 @@ public class PaymentService {
             // Gửi email xác nhận cho đơn hàng COD
             logger.info("Attempting to send order confirmation email for COD order {}", savedOrder.getId());
             try {
-                emailService.send(
+                emailService.sendOrderConfirmationEmail(
                         savedOrder.getEmail(),
-                        "Xác nhận đơn hàng #" + savedOrder.getId(),
-                        "Cảm ơn bạn đã đặt hàng! Đơn hàng #" + savedOrder.getId()
-                                + " của bạn đã được xác nhận và sẽ sớm được xử lý. Bạn sẽ thanh toán khi nhận hàng.");
+                        savedOrder.getCustomerName(),
+                        savedOrder.getId().toString(),
+                        savedOrder.getTotal(),
+                        savedOrder.getPaymentMethod(),
+                        savedOrder.getShippingAddress());
                 logger.info("Successfully sent order confirmation email for COD order {}", savedOrder.getId());
             } catch (Exception e) {
                 logger.error("Failed to send order confirmation email for COD order {}", savedOrder.getId(), e);

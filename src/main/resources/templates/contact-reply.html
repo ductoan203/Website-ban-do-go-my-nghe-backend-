@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Phản hồi từ Đồ gỗ mỹ nghệ Hùng Dũng</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+<div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+    <h2 style="color: #8B4513;">Phản hồi từ Đồ gỗ mỹ nghệ Hùng Dũng</h2>
+
+    <p>Kính gửi <span th:text="${recipientName}"></span>,</p>
+    <p>Chúng tôi đã nhận được tin nhắn của bạn và xin gửi phản hồi như sau:</p>
+
+    <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <p style="white-space: pre-wrap;" th:text="${replyContent}"></p>
+    </div>
+
+    <p>Trân trọng,</p>
+    <p>Đội ngũ Đồ gỗ mỹ nghệ Hùng Dũng</p>
+
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666;">
+        <p>Email này được gửi tự động. Vui lòng không trả lời email này.</p>
+    </div>
+</div>
+</body>
+</html>

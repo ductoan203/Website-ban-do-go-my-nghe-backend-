@@ -8,8 +8,6 @@ import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -21,7 +19,7 @@ import java.util.Random;
 @Slf4j
 public class OtpService {
     @Autowired
-    private JavaMailSender mailSender;
+    private EmailService emailService;
     @Autowired
     private OtpTokenRepository otpTokenRepository;
 
@@ -32,7 +30,6 @@ public class OtpService {
         otpTokenRepository.deleteByUser(user); // <-- Custom JPQL này mới chạy thật
 
         log.info("✅ Đã xoá, tạo OTP mới");
-
 
         // Tạo mã OTP mới
         String otpCode = String.valueOf(new Random().nextInt(900000) + 100000);
@@ -48,12 +45,7 @@ public class OtpService {
 
         // Gửi email
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(user.getEmail());
-            message.setSubject("Xác thực tài khoản - Đồ Gỗ Mỹ Nghệ Hùng Dũng");
-            message.setText("Mã OTP mới của bạn là: " + otpCode +
-                    "\nMã có hiệu lực trong 5 phút.");
-            mailSender.send(message);
+            emailService.sendOtpEmail(user.getEmail(), otpCode);
             log.info("✅ Đã gửi lại OTP {} cho {}", otpCode, user.getEmail());
         } catch (Exception e) {
             log.error("❌ Gửi OTP thất bại: {}", e.getMessage(), e);

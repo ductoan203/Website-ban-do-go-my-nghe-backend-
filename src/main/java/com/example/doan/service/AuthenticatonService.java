@@ -13,13 +13,16 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.text.ParseException;
@@ -35,15 +38,16 @@ import java.util.StringJoiner;
 @Service
 public class AuthenticatonService {
     private final UserRepository userRepository;
+    @Autowired
+    private final EntityManager entityManager;
 
     @NonFinal
     @Value("${jwt.signerKey}")
-    protected String SIGNER_KEY ;
-//
-//    @NonFinal
-//    public static final String SIGNER_KEY = "pHH1DDMlHM9yT4I/s9Fu2qneHTC4u+TaviCWjz7R9bMHezrkfehOK02PsZQwqCn5";
-
-
+    protected String SIGNER_KEY;
+    //
+    // @NonFinal
+    // public static final String SIGNER_KEY =
+    // "pHH1DDMlHM9yT4I/s9Fu2qneHTC4u+TaviCWjz7R9bMHezrkfehOK02PsZQwqCn5";
 
     public IntrospectRespone introspect(IntrospectRequest request)
             throws JOSEException, ParseException {
@@ -68,15 +72,19 @@ public class AuthenticatonService {
                 .build();
     }
 
-
+    @Transactional
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
         var user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
+        entityManager.refresh(user); // Force refresh the user object from the database
+
+        log.info("DEBUG: User {} has isVerified status: {}", user.getEmail(), user.getIsVerified());
+
         // Kiểm tra tài khoản có bị khóa không
-//        if (!Boolean.TRUE.equals(user.getIsActive())) {
-//            throw new AppException(ErrorCode.USER_IS_LOCKED);
-//        }
+        // if (!Boolean.TRUE.equals(user.getIsActive())) {
+        // throw new AppException(ErrorCode.USER_IS_LOCKED);
+        // }
 
         // Kiểm tra xác minh email cho USER
         if ("USER".equalsIgnoreCase(user.getRole().getName()) && !Boolean.TRUE.equals(user.getIsVerified())) {
@@ -98,7 +106,6 @@ public class AuthenticatonService {
                 .build();
     }
 
-
     private String generateToken(User user) {
         JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
 
@@ -107,8 +114,7 @@ public class AuthenticatonService {
                 .issuer("example.com")
                 .issueTime(new Date())
                 .expirationTime(new Date(
-                        Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()
-                ))
+                        Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()))
                 .claim("id", user.getUserId()) // Thêm id
                 .claim("name", user.getFullname()) // Thêm name
                 .claim("email", user.getEmail()) // Thêm email
@@ -117,7 +123,7 @@ public class AuthenticatonService {
 
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());
 
-        JWSObject jwsObject = new  JWSObject(header, payload);
+        JWSObject jwsObject = new JWSObject(header, payload);
 
         try {
             jwsObject.sign(new MACSigner(SIGNER_KEY.getBytes()));
@@ -127,8 +133,9 @@ public class AuthenticatonService {
             throw new RuntimeException(e);
         }
     }
-    private String buildScope(User user){
-        if (user.getRole() != null){
+
+    private String buildScope(User user) {
+        if (user.getRole() != null) {
             return user.getRole().getName();
         }
         return "";

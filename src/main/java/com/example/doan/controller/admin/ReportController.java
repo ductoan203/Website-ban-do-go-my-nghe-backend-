@@ -14,9 +14,12 @@ public class ReportController {
     private final ReportService reportService;
 
     @GetMapping
-    public ApiResponse<ReportResponse> getReport(@RequestParam(defaultValue = "WEEK") String timeRange) {
+    public ApiResponse<ReportResponse> getReport(
+            @RequestParam String startDate,
+            @RequestParam String endDate,
+            @RequestParam(required = false) String status) {
         return ApiResponse.<ReportResponse>builder()
-                .result(reportService.getReportData(timeRange.toUpperCase()))
+                .result(reportService.getReportData(startDate, endDate, status))
                 .build();
     }
 

@@ -14,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -31,39 +32,36 @@ public class AdminUserController {
     @PostMapping
     ApiResponse<User> createUser(@RequestBody @Valid UserCreateRequest request) {
         return ApiResponse.<User>builder()
-                .result(userService.createUser(request))
+                .result(userService.createCustomer(request))
                 .build();
     }
 
     @PostMapping("/customers")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<UserResponse> createCustomer(@RequestBody @Valid UserCreateRequest request) {
-        User newUser = userService.createUser(request);
+        User newUser = userService.createCustomer(request);
         return ApiResponse.<UserResponse>builder()
-                .result(UserResponse.fromEntity(newUser))
+                .result(UserResponse.fromUser(newUser))
                 .build();
     }
 
-    @GetMapping
-    ApiResponse<List<User>> getAllUsers() {
-        var authenticated = SecurityContextHolder.getContext().getAuthentication();
-        log.info("Username: {}", authenticated.getName());
-        authenticated.getAuthorities().forEach(grantedAuthority -> {
-            log.info(grantedAuthority.getAuthority());
-        });
-
-        return ApiResponse.<List<User>>builder()
-                .result(userService.getAllUsers(null))
+    @GetMapping("/allUsers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<List<UserResponse>> getAllUsers() {
+        return ApiResponse.<List<UserResponse>>builder()
+                .result(userService.getAllUsers(null).stream()
+                        .map(UserResponse::fromUser)
+                        .collect(Collectors.toList()))
                 .build();
     }
 
     @GetMapping("/customers")
     public ApiResponse<List<UserResponse>> getAllCustomers(@RequestParam(required = false) String searchTerm) {
-        List<UserResponse> users = userService.getAllUsers(searchTerm)
-                .stream()
-                .filter(u -> u.getRole() != null && "USER".equalsIgnoreCase(u.getRole().getName()))
-                .map(UserResponse::fromEntity)
-                .toList();
+        List<UserResponse> users = userService.getAllUsers(searchTerm).stream()
+                .map(UserResponse::fromUser)
+                .filter(userResponse -> userResponse.getRole() != null
+                        && "USER".equalsIgnoreCase(userResponse.getRole().getName()))
+                .collect(Collectors.toList());
 
         return ApiResponse.<List<UserResponse>>builder()
                 .result(users)

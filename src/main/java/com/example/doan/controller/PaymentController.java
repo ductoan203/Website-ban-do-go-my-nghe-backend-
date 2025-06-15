@@ -143,12 +143,13 @@ public class PaymentController {
             orderService.deductStock(order);
 
             // Gửi email xác nhận sau khi thanh toán Momo thành công
-            emailService.send(
+            emailService.sendOrderConfirmationEmail(
                     order.getEmail(),
-                    "Xác nhận đơn hàng #" + order.getId(),
-                    "Cảm ơn bạn đã thanh toán qua Momo! Đơn hàng #" + order.getId()
-                            + " của bạn đã được xác nhận và sẽ sớm được xử lý." // Nội dung email đơn giản
-            );
+                    order.getCustomerName(),
+                    order.getId().toString(),
+                    order.getTotal(),
+                    order.getPaymentMethod(),
+                    order.getShippingAddress());
 
         }
 
@@ -181,11 +182,13 @@ public class PaymentController {
                     orderService.save(order);
                     orderService.deductStock(order);
                     // Gửi email xác nhận sau khi thanh toán Momo thành công
-                    emailService.send(
+                    emailService.sendOrderConfirmationEmail(
                             order.getEmail(),
-                            "Xác nhận đơn hàng #" + order.getId(),
-                            "Cảm ơn bạn đã thanh toán qua Momo! Đơn hàng #" + order.getId()
-                                    + " của bạn đã được xác nhận và sẽ sớm được xử lý.");
+                            order.getCustomerName(),
+                            order.getId().toString(),
+                            order.getTotal(),
+                            order.getPaymentMethod(),
+                            order.getShippingAddress());
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -301,11 +304,13 @@ public class PaymentController {
             orderService.save(order);
             orderService.deductStock(order);
 
-            emailService.send(
+            emailService.sendOrderConfirmationEmail(
                     order.getEmail(),
-                    "Xác nhận đơn hàng #" + order.getId(),
-                    "Cảm ơn bạn đã thanh toán qua VNPAY. Đơn hàng của bạn đã được xác nhận với tổng tiền là "
-                            + order.getTotal() + " VNĐ.");
+                    order.getCustomerName(),
+                    order.getId().toString(),
+                    order.getTotal(),
+                    order.getPaymentMethod(),
+                    order.getShippingAddress());
 
             String html = "<html><head>"
                     + "<meta http-equiv='refresh' content='5; url=http://localhost:5173' />"

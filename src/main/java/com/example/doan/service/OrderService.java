@@ -20,6 +20,9 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.time.format.DateTimeFormatter;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -50,7 +53,7 @@ public class OrderService {
             cart = cartService.getMyCart(user);
             log.info("[ORDER] cart for user: {}", cart);
             if (cart.getItems().isEmpty()) {
-                log.info("[ORDER] Cart is empty for user {}");
+                log.info("[ORDER] Cart is empty for user {}", username);
                 throw new AppException(ErrorCode.CART_EMPTY);
             }
         } else {
@@ -112,34 +115,7 @@ public class OrderService {
     }
 
     public OrderResponse convertToDto(Order order) {
-        List<OrderItemResponse> items = order.getItems().stream().map(item -> {
-            BigDecimal subtotal = item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-            return OrderItemResponse.builder()
-                    .productId(item.getProduct().getId())
-                    .productName(item.getProduct().getName())
-                    .imageUrl(item.getProduct().getThumbnailUrl() != null
-                            ? "http://localhost:8080/doan" + item.getProduct().getThumbnailUrl()
-                            : null)
-                    .price(item.getPrice())
-                    .quantity(item.getQuantity())
-                    .subtotal(subtotal)
-                    .build();
-        }).toList();
-
-        return OrderResponse.builder()
-                .id(order.getId())
-                .shippingAddress(order.getShippingAddress())
-                .status(order.getStatus().name())
-                .total(order.getTotal())
-                .customerName(order.getUser() != null ? order.getUser().getFullname() : order.getCustomerName())
-                .email(order.getEmail())
-                .phone(order.getPhone())
-                .cancelledBy(order.getCancelledBy())
-                .createdAt(order.getCreatedAt())
-                .paymentMethod(order.getPaymentMethod())
-                .paymentStatus(order.getPaymentStatus())
-                .items(items)
-                .build();
+        return OrderResponse.fromOrder(order);
     }
 
     public List<Order> getAllOrders() {
@@ -251,9 +227,10 @@ public class OrderService {
 
         order.setStatus(Order.OrderStatus.CANCELLED);
         order.setCancelledBy("USER");
+        Order cancelledOrder = orderRepository.save(order);
 
         // Hoàn trả tồn kho cho các sản phẩm trong đơn hàng bị hủy
-        for (OrderItem item : order.getItems()) {
+        for (OrderItem item : cancelledOrder.getItems()) {
             Product product = item.getProduct();
             product.setQuantityInStock(product.getQuantityInStock() + item.getQuantity());
             productRepository.save(product);
@@ -261,13 +238,24 @@ public class OrderService {
                     product.getId(), product.getQuantityInStock());
         }
 
-        return orderRepository.save(order);
+        return cancelledOrder;
     }
 
     @Transactional
     public Order returnOrder(Long orderId) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        if (userId == null) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+
+        if (!order.getUser().getUserId().equals(user.getUserId())) {
+            throw new AppException(ErrorCode.UNAUTHORIZED);
+        }
 
         // Chỉ cho phép trả hàng nếu trạng thái là ĐÃ GIAO
         if (order.getStatus() != Order.OrderStatus.DELIVERED) {
@@ -275,16 +263,18 @@ public class OrderService {
         }
 
         order.setStatus(Order.OrderStatus.RETURNED);
+        Order returnedOrder = orderRepository.save(order);
 
         // Hoàn trả tồn kho cho các sản phẩm trong đơn hàng được trả
-        for (OrderItem item : order.getItems()) {
+        for (OrderItem item : returnedOrder.getItems()) {
             Product product = item.getProduct();
             product.setQuantityInStock(product.getQuantityInStock() + item.getQuantity());
             productRepository.save(product);
             log.info("[ORDER] Đã hoàn trả tồn kho cho sản phẩm {} (id: {}). Tồn kho mới: {}", product.getName(),
                     product.getId(), product.getQuantityInStock());
         }
-        return orderRepository.save(order);
+
+        return returnedOrder;
     }
 
     // ✅ Lọc đơn theo trạng thái cho admin
@@ -292,7 +282,7 @@ public class OrderService {
         List<Order> orders = (status != null)
                 ? orderRepository.findByStatus(status)
                 : orderRepository.findAll();
-        return orders.stream().map(this::convertToDto).toList();
+        return orders.stream().map(this::convertToDto).collect(Collectors.toList());
     }
 
     // ✅ Lọc đơn theo trạng thái cho user
@@ -304,7 +294,7 @@ public class OrderService {
                 ? orderRepository.findByUserAndStatus(user, status)
                 : orderRepository.findByUser(user);
         log.info("[OrderService] Retrieved {} orders for user: {}", orders.size(), username);
-        return orders.stream().map(this::convertToDto).toList();
+        return orders.stream().map(this::convertToDto).collect(Collectors.toList());
     }
 
     public Order findById(Long id) {
@@ -339,5 +329,4 @@ public class OrderService {
                     product.getId(), newQuantityInStock);
         }
     }
-
 }

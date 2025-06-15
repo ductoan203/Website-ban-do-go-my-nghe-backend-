@@ -1,6 +1,5 @@
 package com.example.doan.controller;
 
-
 import com.example.doan.dto.request.*;
 import com.example.doan.dto.response.AuthenticationResponse;
 import com.example.doan.dto.response.IntrospectRespone;
@@ -45,11 +44,10 @@ public class AuthenticationController {
     @Autowired
     private PasswordResetService passwordResetService;
 
-
     @PostMapping("/register")
-    ApiResponse <User> createUser(@RequestBody @Valid UserCreateRequest request) {
+    ApiResponse<User> createUser(@RequestBody @Valid UserCreateRequest request) {
         return ApiResponse.<User>builder()
-                .result(userService.createUser(request))
+                .result(userService.createCustomer(request))
                 .build();
     }
 
@@ -63,8 +61,6 @@ public class AuthenticationController {
         }
 
         User user = token.getUser();
-        user.setIsVerified(true);
-        userRepository.save(user);
 
         otpTokenRepository.delete(token); // Xóa sau khi dùng
 
@@ -122,15 +118,13 @@ public class AuthenticationController {
         passwordResetService.resetPassword(
                 request.getEmail(),
                 request.getOtp(),
-                request.getNewPassword()
-        );
+                request.getNewPassword());
 
         return ApiResponse.<String>builder()
                 .result("Đặt lại mật khẩu thành công")
                 .build();
 
     }
-
 
     @PostMapping("/introspect")
     ApiResponse<IntrospectRespone> authenticate(@RequestBody IntrospectRequest request)

@@ -11,6 +11,7 @@ import com.example.doan.exception.ErrorCode;
 import com.example.doan.repository.OtpTokenRepository;
 import com.example.doan.repository.RoleRepository;
 import com.example.doan.repository.UserRepository;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +45,9 @@ public class UserService {
     private final OtpTokenRepository otpTokenRepository;
     private final OtpService otpService;
 
-    public User createUser(UserCreateRequest request) {
+
+    @Transactional
+    public User createCustomer(UserCreateRequest request) {
         // Kiểm tra email đã tồn tại
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorCode.EMAIL_EXISTS);
@@ -93,13 +96,15 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found!"));
     }
 
+    @Transactional
     public UserResponse getMyInfo() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
-        return UserResponse.fromEntity(user);
+
+        return UserResponse.fromUser(user);
     }
 
     @PreAuthorize("hasRole('ADMIN')")

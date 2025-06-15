@@ -16,5 +16,7 @@ public class Category {
 
     @Column(unique = true)
     private String name;
+    @Column(unique = true)
+    private String slug;
     private String description;
 }
