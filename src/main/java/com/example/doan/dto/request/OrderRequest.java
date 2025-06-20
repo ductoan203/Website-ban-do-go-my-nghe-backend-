@@ -2,6 +2,7 @@ package com.example.doan.dto.request;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -13,4 +14,5 @@ public class OrderRequest {
     private String paymentMethod;
     private String paymentStatus;
     private List<CartItemRequest> items;
+    private BigDecimal total;
 }

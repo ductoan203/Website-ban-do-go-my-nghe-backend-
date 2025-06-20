@@ -76,10 +76,11 @@ public class PaymentController {
 
     // ✅ Tạo URL thanh toán online
     @PostMapping("/momo/create")
-    public ApiResponse<String> createMomoPayment(@RequestParam Long orderId, @RequestParam Long amount) {
+    public ApiResponse<String> createMomoPayment(@RequestBody OrderRequest orderRequest) {
         try {
-            String payUrl = momoService.createPaymentUrl(orderId.toString(), amount);
-            System.out.println("✅ URL Momo trả về: " + payUrl);
+            // Truyền thông tin đơn hàng tạm thời vào extraData (dạng JSON)
+            String extraData = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(orderRequest);
+            String payUrl = momoService.createPaymentUrlWithExtraData(extraData, orderRequest);
             return ApiResponse.<String>builder().result(payUrl).build();
         } catch (Exception e) {
             e.printStackTrace();
@@ -135,22 +136,28 @@ public class PaymentController {
         paymentLogRepository.save(log);
 
         if ("0".equals(payload.get("resultCode"))) {
-            Long orderId = Long.parseLong(payload.get("orderId"));
-            Order order = orderService.findById(orderId);
-            order.setPaymentStatus("PAID");
-            order.setStatus(Order.OrderStatus.CONFIRMED);
-            orderService.save(order);
-            orderService.deductStock(order);
-
-            // Gửi email xác nhận sau khi thanh toán Momo thành công
-            emailService.sendOrderConfirmationEmail(
-                    order.getEmail(),
-                    order.getCustomerName(),
-                    order.getId().toString(),
-                    order.getTotal(),
-                    order.getPaymentMethod(),
-                    order.getShippingAddress());
-
+            try {
+                // Lấy lại OrderRequest từ extraData
+                String extraData = payload.get("extraData");
+                OrderRequest orderRequest = new com.fasterxml.jackson.databind.ObjectMapper().readValue(extraData,
+                        OrderRequest.class);
+                // Tạo đơn hàng thực sự
+                Order order = paymentService.handleCheckout(null, orderRequest);
+                order.setPaymentStatus("PAID");
+                order.setStatus(Order.OrderStatus.CONFIRMED);
+                orderService.save(order);
+                orderService.deductStock(order);
+                // Gửi email xác nhận
+                emailService.sendOrderConfirmationEmail(
+                        order.getEmail(),
+                        order.getCustomerName(),
+                        order.getId().toString(),
+                        order.getTotal(),
+                        order.getPaymentMethod(),
+                        order.getShippingAddress());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
 
         return "IPN received";
@@ -202,12 +209,11 @@ public class PaymentController {
         return new RedirectView(finalRedirectUrl);
     }
 
-    @GetMapping("/vnpay/create")
-    public ResponseEntity<?> createVnpayUrl(HttpServletRequest request,
-                                            @RequestParam("amount") Long amount,
-                                            @RequestParam("orderId") Long orderId) {
+    @PostMapping("/vnpay/create")
+    public ResponseEntity<?> createVnpayUrl(HttpServletRequest request, @RequestBody OrderRequest orderRequest) {
         try {
-            String url = vnPayService.createPaymentUrl(request, amount, orderId.toString());
+            String orderInfo = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(orderRequest);
+            String url = vnPayService.createPaymentUrlWithOrderInfo(request, orderRequest, orderInfo);
             return ResponseEntity.ok(url);
         } catch (Exception e) {
             e.printStackTrace();
@@ -244,12 +250,27 @@ public class PaymentController {
             }
 
             // ✅ Đúng chữ ký => xử lý đơn hàng
-            Long orderId = Long.parseLong(params.get("vnp_TxnRef"));
-            Order order = orderService.findById(orderId);
-            order.setPaymentStatus("PAID");
-            order.setStatus(Order.OrderStatus.CONFIRMED);
-            orderService.save(order);
-            orderService.deductStock(order);
+            if ("00".equals(params.get("vnp_ResponseCode"))) {
+                try {
+                    String orderInfo = params.get("vnp_OrderInfo");
+                    OrderRequest orderRequest = new com.fasterxml.jackson.databind.ObjectMapper().readValue(orderInfo,
+                            OrderRequest.class);
+                    Order order = paymentService.handleCheckout(null, orderRequest);
+                    order.setPaymentStatus("PAID");
+                    order.setStatus(Order.OrderStatus.CONFIRMED);
+                    orderService.save(order);
+                    orderService.deductStock(order);
+                    emailService.sendOrderConfirmationEmail(
+                            order.getEmail(),
+                            order.getCustomerName(),
+                            order.getId().toString(),
+                            order.getTotal(),
+                            order.getPaymentMethod(),
+                            order.getShippingAddress());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
 
             return ResponseEntity.ok("IPN_RECEIVED");
 
