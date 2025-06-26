@@ -6,6 +6,12 @@ import com.example.doan.service.NewsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
+import org.springframework.util.StringUtils;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import java.util.List;
 
@@ -15,14 +21,58 @@ import java.util.List;
 public class AdminNewsController {
     private final NewsService newsService;
 
-    @PostMapping
-    public ApiResponse<News> create(@RequestBody @Valid News news) {
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<News> create(
+            @RequestPart("title") String title,
+            @RequestPart("content") String content,
+            @RequestPart("slug") String slug,
+            @RequestPart(value = "thumbnail", required = false) MultipartFile thumbnail) {
+        News news = new News();
+        news.setTitle(title);
+        news.setContent(content);
+        news.setSlug(slug);
+        if (thumbnail != null && !thumbnail.isEmpty()) {
+            try {
+                String filename = System.currentTimeMillis() + "_"
+                        + StringUtils.cleanPath(thumbnail.getOriginalFilename());
+                Path uploadPath = Paths.get("uploads/" + filename);
+                Files.createDirectories(uploadPath.getParent());
+                Files.copy(thumbnail.getInputStream(), uploadPath);
+                news.setThumbnailUrl("/uploads/" + filename);
+            } catch (Exception e) {
+                throw new RuntimeException("Lỗi upload ảnh: " + e.getMessage());
+            }
+        }
         return ApiResponse.<News>builder().result(newsService.create(news)).build();
     }
 
-    @PutMapping("/{id}")
-    public ApiResponse<News> update(@PathVariable Long id, @RequestBody @Valid News news) {
-        return ApiResponse.<News>builder().result(newsService.update(id, news)).build();
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<News> update(
+            @PathVariable Long id,
+            @RequestPart("title") String title,
+            @RequestPart("content") String content,
+            @RequestPart("slug") String slug,
+            @RequestPart(value = "thumbnail", required = false) MultipartFile thumbnail) {
+        News oldNews = newsService.getById(id);
+        News updatedNews = new News();
+        updatedNews.setTitle(title);
+        updatedNews.setContent(content);
+        updatedNews.setSlug(slug);
+        if (thumbnail != null && !thumbnail.isEmpty()) {
+            try {
+                String filename = System.currentTimeMillis() + "_"
+                        + StringUtils.cleanPath(thumbnail.getOriginalFilename());
+                Path uploadPath = Paths.get("uploads/" + filename);
+                Files.createDirectories(uploadPath.getParent());
+                Files.copy(thumbnail.getInputStream(), uploadPath);
+                updatedNews.setThumbnailUrl("/uploads/" + filename);
+            } catch (Exception e) {
+                throw new RuntimeException("Lỗi upload ảnh: " + e.getMessage());
+            }
+        } else {
+            updatedNews.setThumbnailUrl(oldNews.getThumbnailUrl());
+        }
+        return ApiResponse.<News>builder().result(newsService.update(id, updatedNews)).build();
     }
 
     @DeleteMapping("/{id}")

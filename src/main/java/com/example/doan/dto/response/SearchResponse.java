@@ -14,6 +14,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SearchResponse {
-    private List<Product> products;
-    private List<Category> categories;
+    private List<ProductResponse> products;
+    private List<CategoryResponse> categories;
 }

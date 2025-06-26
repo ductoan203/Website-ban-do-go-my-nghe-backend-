@@ -135,4 +135,12 @@ public class OrderDashboardService {
                 "newOrdersToday", newOrdersToday,
                 "recentOrders", recentOrderResponses);
     }
+
+    public long countOrdersToday() {
+        LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+        LocalDateTime endOfDay = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59).withNano(999999999);
+        Instant startOfDayInstant = startOfDay.atZone(ZoneId.systemDefault()).toInstant();
+        Instant endOfDayInstant = endOfDay.atZone(ZoneId.systemDefault()).toInstant();
+        return orderRepository.countByCreatedAtBetween(startOfDayInstant, endOfDayInstant);
+    }
 }

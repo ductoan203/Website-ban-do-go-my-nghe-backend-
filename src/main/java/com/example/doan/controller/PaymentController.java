@@ -2,10 +2,15 @@ package com.example.doan.controller;
 
 import com.example.doan.dto.request.ApiResponse;
 import com.example.doan.dto.request.OrderRequest;
+import com.example.doan.dto.request.CartItemRequest;
 import com.example.doan.dto.response.OrderResponse;
+import com.example.doan.dto.request.PayOSCreateRequest;
+import com.example.doan.dto.request.PayOSWebhookRequest;
 import com.example.doan.entity.Order;
 import com.example.doan.entity.PaymentLog;
 import com.example.doan.entity.User;
+import com.example.doan.exception.AppException;
+import com.example.doan.exception.ErrorCode;
 import com.example.doan.service.*;
 import com.example.doan.repository.PaymentLogRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +30,10 @@ import java.util.TreeMap;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import java.math.BigDecimal;
 
 import static com.example.doan.service.VNPayService.hmacSHA512;
 
@@ -45,6 +54,8 @@ public class PaymentController {
     private final EmailService emailService;
     @Autowired
     private final VNPayService vnPayService;
+    @Autowired
+    private final PayOSService payOSService;
 
     @PostMapping("/checkout")
     public ApiResponse<OrderResponse> checkout(@RequestBody OrderRequest request) {
@@ -347,6 +358,88 @@ public class PaymentController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("❌ Lỗi xử lý đơn hàng sau thanh toán");
+        }
+    }
+
+    @PostMapping("/payos/create")
+    public ApiResponse<Map<String, String>> createPayOSPaymentLink(@RequestBody PayOSCreateRequest request) {
+        try {
+            // Chỉ tạo link PayOS, không tạo đơn hàng
+            String paymentUrl = payOSService.createPaymentLink(request);
+
+            if (paymentUrl == null || paymentUrl.isEmpty()) {
+                log.error("PayOS returned null or empty payment URL");
+                return ApiResponse.<Map<String, String>>builder()
+                        .code(9999)
+                        .message("Không thể tạo URL thanh toán: URL trả về rỗng")
+                        .build();
+            }
+
+            return ApiResponse.<Map<String, String>>builder()
+                    .code(0)
+                    .message("Thành công")
+                    .result(Map.of("checkoutUrl", paymentUrl))
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Error creating PayOS payment link: {}", e.getMessage(), e);
+            return ApiResponse.<Map<String, String>>builder()
+                    .code(9999)
+                    .message("Lỗi khi tạo URL thanh toán: " + e.getMessage())
+                    .build();
+        }
+    }
+
+    @PostMapping("/payos/webhook")
+    public ResponseEntity<?> handlePayOSWebhook(@RequestBody Map<String, Object> requestBody) {
+        try {
+            log.info("Received PayOS webhook: {}", requestBody);
+
+            Map<String, Object> data = (Map<String, Object>) requestBody.get("data");
+            String signature = (String) requestBody.get("signature");
+
+            if (data == null || signature == null) {
+                log.warn("Missing data or signature in PayOS webhook");
+                return ResponseEntity.badRequest().body("Missing data or signature");
+            }
+
+            if (!payOSService.isValidWebhookSignature(data, signature)) {
+                log.warn("Invalid PayOS webhook signature");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid signature");
+            }
+
+            String code = data.get("code") != null ? data.get("code").toString() : null;
+            String orderCode = data.get("orderCode") != null ? data.get("orderCode").toString() : null;
+
+            if ("00".equals(code) && orderCode != null) {
+                try {
+                    Long orderId = Long.parseLong(orderCode);
+                    Order order = orderService.findById(orderId);
+                    if (order != null && "PAYOS".equals(order.getPaymentMethod())) {
+                        order.setStatus(Order.OrderStatus.CONFIRMED);
+                        order.setPaymentStatus("PAID");
+                        orderService.save(order);
+                        orderService.deductStock(order);
+                        emailService.sendOrderConfirmationEmail(
+                                order.getEmail(),
+                                order.getCustomerName(),
+                                order.getId().toString(),
+                                order.getTotal(),
+                                order.getPaymentMethod(),
+                                order.getShippingAddress());
+                        log.info("Order {} confirmed and email sent", orderId);
+                    } else {
+                        log.warn("Order {} not found or not PAYOS", orderId);
+                    }
+                } catch (Exception e) {
+                    log.error("Error updating order from PayOS webhook: {}", e.getMessage(), e);
+                }
+            }
+
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("Error processing PayOS webhook", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
     }
 

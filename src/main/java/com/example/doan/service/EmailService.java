@@ -72,6 +72,15 @@ public class EmailService {
             context.setVariable("paymentMethod", paymentMethod);
             context.setVariable("shippingAddress", shippingAddress);
 
+            // Thêm thông điệp thanh toán động
+            String paymentMessage;
+            if ("PAYOS".equalsIgnoreCase(paymentMethod) || "ONLINE".equalsIgnoreCase(paymentMethod)) {
+                paymentMessage = "Bạn đã thanh toán thành công đơn hàng này.";
+            } else {
+                paymentMessage = "Bạn sẽ thanh toán khi nhận hàng.";
+            }
+            context.setVariable("paymentMessage", paymentMessage);
+
             String htmlContent = templateEngine.process("order-confirmation", context);
 
             helper.setFrom("noreply@hungdung.com"); // Email của bạn

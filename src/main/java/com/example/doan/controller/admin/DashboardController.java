@@ -40,7 +40,8 @@ public class DashboardController {
                         "totalOrders", totalOrders,
                         "statusCounts", statusCounts,
                         "monthlyRevenue", monthlyRevenue, // Thêm doanh thu tháng
-                        "recentOrders", recentOrderResponses // Thêm đơn hàng gần đây
+                        "recentOrders", recentOrderResponses, // Thêm đơn hàng gần đây
+                        "newOrdersToday", dashboardService.countOrdersToday()
                 ))
                 .build();
     }

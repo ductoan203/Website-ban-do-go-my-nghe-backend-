@@ -12,6 +12,8 @@ import java.net.UnknownHostException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,8 +81,8 @@ public class VNPayService {
                 String fieldName = fieldNames.get(i);
                 String fieldValue = vnp_Params.get(fieldName);
                 if (fieldValue != null && fieldValue.length() > 0) {
-                    query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII)).append("=")
-                            .append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
+                    query.append(URLEncoder.encode(fieldName, StandardCharsets.UTF_8)).append("=")
+                            .append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8));
                     if (i < fieldNames.size() - 1) {
                         query.append("&");
                     }
@@ -108,7 +110,7 @@ public class VNPayService {
             vnp_Params.put("vnp_Command", "pay");
             vnp_Params.put("vnp_TmnCode", vnpayConfig.getTmnCode());
             vnp_Params.put("vnp_Amount",
-                    String.valueOf(orderRequest.getTotal().multiply(BigDecimal.valueOf(100)).intValue()));
+                    String.valueOf(orderRequest.getTotal().multiply(BigDecimal.valueOf(100)).longValue()));
             vnp_Params.put("vnp_CurrCode", "VND");
             String orderId = UUID.randomUUID().toString();
             vnp_Params.put("vnp_TxnRef", orderId);
@@ -118,6 +120,9 @@ public class VNPayService {
             vnp_Params.put("vnp_ReturnUrl", vnpayConfig.getReturnUrl());
             vnp_Params.put("vnp_IpAddr", vnp_IpAddr);
             vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
+            String expireDate = LocalDateTime.now().plusMinutes(15).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+            vnp_Params.put("vnp_ExpireDate", expireDate);
+
 
             // 1. KHÔNG thêm vnp_SecureHash vào map khi tạo hashData
             List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
@@ -143,8 +148,8 @@ public class VNPayService {
                 String fieldName = fieldNames.get(i);
                 String fieldValue = vnp_Params.get(fieldName);
                 if (fieldValue != null && fieldValue.length() > 0) {
-                    query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII)).append("=")
-                            .append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
+                    query.append(URLEncoder.encode(fieldName, StandardCharsets.UTF_8)).append("=")
+                            .append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8));
                     if (i < fieldNames.size() - 1) {
                         query.append("&");
                     }

@@ -117,7 +117,8 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
-    public Page<ProductResponse> searchProducts(String keyword, Long categoryId, Pageable pageable) {
+    public Page<ProductResponse> searchProducts(String keyword, Long categoryId, Pageable pageable, String stockStatus,
+                                                String sort) {
         Page<Product> productPage;
         if ((keyword == null || keyword.trim().isEmpty()) && categoryId == null) {
             productPage = productRepository.findAll(pageable);
@@ -132,7 +133,28 @@ public class ProductService {
             productPage = productRepository.findByNameContainingIgnoreCase(keyword, pageable);
         }
 
-        List<ProductResponse> dtoList = productPage.getContent().stream()
+        // Lọc theo tình trạng hàng
+        List<Product> filtered = productPage.getContent();
+        if (stockStatus != null) {
+            if (stockStatus.equals("con_hang")) {
+                filtered = filtered.stream().filter(p -> p.getQuantityInStock() != null && p.getQuantityInStock() > 0)
+                        .toList();
+            } else if (stockStatus.equals("het_hang")) {
+                filtered = filtered.stream().filter(p -> p.getQuantityInStock() != null && p.getQuantityInStock() == 0)
+                        .toList();
+            }
+        }
+
+        // Sắp xếp theo giá
+        if (sort != null) {
+            if (sort.equals("asc")) {
+                filtered = filtered.stream().sorted((a, b) -> a.getPrice().compareTo(b.getPrice())).toList();
+            } else if (sort.equals("desc")) {
+                filtered = filtered.stream().sorted((a, b) -> b.getPrice().compareTo(a.getPrice())).toList();
+            }
+        }
+
+        List<ProductResponse> dtoList = filtered.stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
 

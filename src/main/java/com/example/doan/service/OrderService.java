@@ -16,6 +16,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -147,6 +150,19 @@ public class OrderService {
         }
 
         order.setStatus(newStatus);
+
+        // Đồng bộ trạng thái thanh toán với trạng thái đơn hàng
+        if (newStatus == Order.OrderStatus.DELIVERED || newStatus == Order.OrderStatus.CONFIRMED) {
+            order.setPaymentStatus("PAID");
+        } else if (newStatus == Order.OrderStatus.CANCELLED) {
+            order.setPaymentStatus("CANCELLED");
+        } else if (newStatus == Order.OrderStatus.PENDING || newStatus == Order.OrderStatus.READY_FOR_DELIVERY
+                || newStatus == Order.OrderStatus.SHIPPED) {
+            // Nếu trước đó đã thanh toán thì giữ nguyên, chưa thì là UNPAID
+            if (!"PAID".equals(order.getPaymentStatus())) {
+                order.setPaymentStatus("UNPAID");
+            }
+        }
 
         // Cập nhật trường cancelledBy khi chuyển trạng thái thành CANCELLED
         if (newStatus == Order.OrderStatus.CANCELLED) {
@@ -328,5 +344,14 @@ public class OrderService {
             log.info("[ORDER] Đã trừ tồn kho cho sản phẩm {} (id: {}). Tồn kho mới: {}", product.getName(),
                     product.getId(), newQuantityInStock);
         }
+    }
+
+    // Lấy danh sách đơn hàng phân trang cho admin
+    public Page<OrderResponse> getAllOrdersPaged(Integer page, Integer size, Order.OrderStatus status) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Order> orderPage = (status != null)
+                ? orderRepository.findByStatusOrderByCreatedAtDesc(status, pageable)
+                : orderRepository.findAllByOrderByCreatedAtDesc(pageable);
+        return orderPage.map(this::convertToDto);
     }
 }

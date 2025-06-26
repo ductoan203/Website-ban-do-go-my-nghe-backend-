@@ -5,6 +5,7 @@ import com.example.doan.dto.response.OrderResponse;
 import com.example.doan.entity.Order;
 import com.example.doan.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,9 +17,12 @@ public class AdminOrderController {
     private final OrderService orderService;
 
     @GetMapping()
-    public ApiResponse<List<OrderResponse>> getAllOrders(@RequestParam(required = false) Order.OrderStatus status) {
-        return ApiResponse.<List<OrderResponse>>builder()
-                .result(orderService.getAllOrdersByStatus(status))
+    public ApiResponse<Page<OrderResponse>> getAllOrders(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "15") int size,
+            @RequestParam(required = false) Order.OrderStatus status) {
+        return ApiResponse.<Page<OrderResponse>>builder()
+                .result(orderService.getAllOrdersPaged(page, size, status))
                 .build();
     }
 

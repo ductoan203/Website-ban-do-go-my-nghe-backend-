@@ -1,6 +1,8 @@
 package com.example.doan.service;
 
 import com.example.doan.dto.response.SearchResponse;
+import com.example.doan.dto.response.ProductResponse;
+import com.example.doan.dto.response.CategoryResponse;
 import com.example.doan.entity.Category;
 import com.example.doan.entity.Product;
 import com.example.doan.repository.CategoryRepository;
@@ -19,13 +21,22 @@ public class SearchService {
 
     public SearchResponse search(String searchTerm) {
         List<Product> products = productRepository
-                .findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm, searchTerm);
+                .findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm,
+                        searchTerm);
         List<Category> categories = categoryRepository
-                .findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm, searchTerm);
+                .findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(searchTerm,
+                        searchTerm);
+
+        List<ProductResponse> productResponses = products.stream()
+                .map(ProductResponse::fromProduct)
+                .toList();
+        List<CategoryResponse> categoryResponses = categories.stream()
+                .map(CategoryResponse::fromCategory)
+                .toList();
 
         return SearchResponse.builder()
-                .products(products)
-                .categories(categories)
+                .products(productResponses)
+                .categories(categoryResponses)
                 .build();
     }
 }

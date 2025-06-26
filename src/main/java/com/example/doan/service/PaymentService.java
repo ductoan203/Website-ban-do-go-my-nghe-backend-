@@ -4,6 +4,7 @@ import com.example.doan.dto.request.OrderRequest;
 import com.example.doan.entity.*;
 import com.example.doan.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -118,51 +119,64 @@ public class PaymentService {
                 Product product = item.getProduct();
                 int newQuantityInStock = product.getQuantityInStock() - item.getQuantity();
                 if (newQuantityInStock < 0) {
-                    // Tồn kho bị âm (trường hợp này không nên xảy ra nếu kiểm tra ở giỏ hàng đúng)
-                    // Xử lý lỗi hoặc log cảnh báo
                     logger.warn("[PAYMENT] Tồn kho âm cho sản phẩm {} (id: {}). New stock: {}", product.getName(),
                             product.getId(), newQuantityInStock);
-                    newQuantityInStock = 0; // Đảm bảo tồn kho không âm
+                    newQuantityInStock = 0;
                 }
                 product.setQuantityInStock(newQuantityInStock);
-                productRepository.save(product); // Lưu lại thông tin sản phẩm với tồn kho mới
+                productRepository.save(product);
                 logger.info("[PAYMENT] Đã trừ tồn kho cho sản phẩm {} (id: {}). Tồn kho mới: {}", product.getName(),
                         product.getId(), newQuantityInStock);
             }
 
-            logger.info("[PAYMENT] orderId: {}, userId trong order: {}", savedOrder.getId(),
-                    savedOrder.getUser() != null ? savedOrder.getUser().getUserId() : null);
+            // Gửi email xác nhận cho COD
+            emailService.sendOrderConfirmationEmail(
+                    order.getEmail(),
+                    order.getCustomerName(),
+                    order.getId().toString(),
+                    order.getTotal(),
+                    order.getPaymentMethod(),
+                    order.getShippingAddress());
 
-            // Gửi email xác nhận cho đơn hàng COD
-            logger.info("Attempting to send order confirmation email for COD order {}", savedOrder.getId());
-            try {
-                emailService.sendOrderConfirmationEmail(
-                        savedOrder.getEmail(),
-                        savedOrder.getCustomerName(),
-                        savedOrder.getId().toString(),
-                        savedOrder.getTotal(),
-                        savedOrder.getPaymentMethod(),
-                        savedOrder.getShippingAddress());
-                logger.info("Successfully sent order confirmation email for COD order {}", savedOrder.getId());
-            } catch (Exception e) {
-                logger.error("Failed to send order confirmation email for COD order {}", savedOrder.getId(), e);
-            }
-
-            cart.getItems().clear(); // Xóa giỏ hàng sau khi đặt hàng thành công
-            logger.info("[PAYMENT] === KẾT THÚC HANDLE CHECKOUT ===");
             return savedOrder;
+        } else if ("PAYOS".equalsIgnoreCase(request.getPaymentMethod())) {
+            // Đơn hàng PayOS: chỉ lưu với trạng thái PENDING, chưa trừ tồn kho
+            order.setStatus(Order.OrderStatus.PENDING);
+            order.setPaymentStatus("PENDING");
+            order.setPaymentMethod("PAYOS");
+            return orderRepository.save(order);
         } else {
+            // Đơn online: chờ thanh toán thành công mới xác nhận
             order.setStatus(Order.OrderStatus.PENDING);
             order.setPaymentStatus("PENDING");
             order.setPaymentMethod(request.getPaymentMethod());
         }
-
         Order savedOrder = orderRepository.save(order);
 
         logger.info("[PAYMENT] orderId: {}, userId trong order: {}", savedOrder.getId(),
                 savedOrder.getUser() != null ? savedOrder.getUser().getUserId() : null);
         logger.info("[PAYMENT] === KẾT THÚC HANDLE CHECKOUT ===");
         return savedOrder;
+    }
+
+    @Scheduled(fixedRate = 300000) // Chạy mỗi 5 phút
+    @Transactional
+    public void cleanupPendingPayOSOrders() {
+        try {
+            // Tìm các đơn PayOS PENDING cũ hơn 30 phút
+            List<Order> pendingOrders = orderRepository.findByPaymentMethodAndStatusAndCreatedAtBefore(
+                    "PAYOS",
+                    Order.OrderStatus.PENDING,
+                    Instant.now().minusSeconds(1800) // 30 phút
+            );
+
+            if (!pendingOrders.isEmpty()) {
+                logger.info("Cleaning up {} pending PayOS orders", pendingOrders.size());
+                orderRepository.deleteAll(pendingOrders);
+            }
+        } catch (Exception e) {
+            logger.error("Error cleaning up pending PayOS orders", e);
+        }
     }
 
 }

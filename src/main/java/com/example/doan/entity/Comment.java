@@ -5,6 +5,7 @@ import lombok.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "comments")
@@ -12,7 +13,7 @@ import java.time.LocalDateTime;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class Comment {
 
     @Id
@@ -33,6 +34,15 @@ public class Comment {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private Comment parent;
+
+    @OneToMany(mappedBy = "parent")
+    @JsonIgnore
+    private List<Comment> replies;
 
     @PrePersist
     protected void onCreate() {

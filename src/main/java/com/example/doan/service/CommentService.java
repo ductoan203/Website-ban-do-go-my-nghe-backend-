@@ -83,11 +83,21 @@ public class CommentService {
         }
 
         Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND)); // Need COMMENT_NOT_FOUND error code
+                .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
 
-        // Check if the current user is the author of the comment
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        // Nếu là admin thì cho phép xóa bất kỳ bình luận nào
+        if (currentUser.getRole() != null &&
+                "ADMIN".equalsIgnoreCase(currentUser.getRole().getName())) {
+            commentRepository.delete(comment);
+            return;
+        }
+
+        // Nếu không phải admin, chỉ cho phép xóa bình luận của chính mình
         if (!comment.getUser().getUserId().equals(currentUserId)) {
-            throw new AppException(ErrorCode.ACCESS_DENIED); // Need ACCESS_DENIED error code
+            throw new AppException(ErrorCode.ACCESS_DENIED);
         }
 
         commentRepository.delete(comment);
@@ -96,5 +106,26 @@ public class CommentService {
     // Get all comments (for admin)
     public List<Comment> getAllComments() {
         return commentRepository.findAll();
+    }
+
+    // Admin reply to a comment
+    public Comment replyToComment(Long productId, Long parentCommentId, String content) {
+        Long userId = SecurityUtil.getCurrentUserId();
+        if (userId == null) {
+            throw new AppException(ErrorCode.UNAUTHENTICATED);
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_NOT_FOUND));
+        Comment parent = commentRepository.findById(parentCommentId)
+                .orElseThrow(() -> new AppException(ErrorCode.COMMENT_NOT_FOUND));
+        Comment reply = Comment.builder()
+                .product(product)
+                .user(user)
+                .content(content)
+                .parent(parent)
+                .build();
+        return commentRepository.save(reply);
     }
 }

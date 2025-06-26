@@ -14,7 +14,7 @@
     <li>Phương thức thanh toán: <span th:text="${paymentMethod}"></span></li>
     <li>Địa chỉ giao hàng: <span th:text="${shippingAddress}"></span></li>
 </ul>
-<p>Bạn sẽ thanh toán khi nhận hàng.</p>
+<p th:text="${paymentMessage}"></p>
 <p>Nếu bạn có bất kỳ câu hỏi nào, xin đừng ngần ngại liên hệ với chúng tôi.</p>
 <p>Trân trọng,<br/>Đội ngũ cửa hàng của bạn</p>
 </body>

@@ -42,6 +42,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/search/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/contact").permitAll()
                 .requestMatchers(HttpMethod.GET, "/contact").permitAll()
+                .requestMatchers(HttpMethod.GET, "/news/**").permitAll() // Cho phép public
+                .requestMatchers(HttpMethod.POST, "/payment/payos/create").permitAll()
+                .requestMatchers(HttpMethod.POST, "/doan/payment/payos/webhook").permitAll()
+                .requestMatchers(HttpMethod.POST, "/payment/payos/webhook").permitAll()
+                .requestMatchers(HttpMethod.POST, "/payment/payos/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("doan/admin/dashboard/top-products").permitAll()
                 .requestMatchers(HttpMethod.POST, "/payment/checkout").permitAll()

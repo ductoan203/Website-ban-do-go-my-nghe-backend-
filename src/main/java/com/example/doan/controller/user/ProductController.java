@@ -3,6 +3,8 @@ package com.example.doan.controller.user;
 import com.example.doan.dto.request.ApiResponse;
 import com.example.doan.dto.request.CommentRequest;
 import com.example.doan.dto.response.ProductResponse;
+import com.example.doan.dto.response.CommentResponse;
+import com.example.doan.dto.response.UserResponse;
 import com.example.doan.entity.Comment;
 import com.example.doan.service.ProductService;
 import com.example.doan.service.CommentService;
@@ -37,17 +39,21 @@ public class ProductController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "10") int size,
-            @RequestParam(required = false, defaultValue = "4") int top) {
+            @RequestParam(required = false, defaultValue = "4") int top,
+            @RequestParam(required = false) String stockStatus,
+            @RequestParam(required = false) String sort) {
 
         if (categoryId != null) {
             Pageable pageable = PageRequest.of(0, top);
-            Page<ProductResponse> productsPage = productService.searchProducts(null, categoryId, pageable);
+            Page<ProductResponse> productsPage = productService.searchProducts(null, categoryId, pageable, stockStatus,
+                    sort);
             return ApiResponse.<Page<ProductResponse>>builder()
                     .result(productsPage)
                     .build();
         } else {
             Pageable pageable = PageRequest.of(page, size);
-            Page<ProductResponse> paginatedProducts = productService.searchProducts(null, null, pageable);
+            Page<ProductResponse> paginatedProducts = productService.searchProducts(null, null, pageable, stockStatus,
+                    sort);
 
             System.out.println("Debug: Paginated products content size: "
                     + paginatedProducts.getContent().size());
@@ -89,10 +95,20 @@ public class ProductController {
 
     // Get comments for a product
     @GetMapping("/{productId}/comments")
-    public ApiResponse<List<Comment>> getProductComments(@PathVariable Long productId) {
+    public ApiResponse<List<CommentResponse>> getProductComments(@PathVariable Long productId) {
         try {
-            return ApiResponse.<List<Comment>>builder()
-                    .result(commentService.getCommentsByProductId(productId))
+            List<Comment> comments = commentService.getCommentsByProductId(productId);
+            List<CommentResponse> dtos = comments.stream().map(c -> new CommentResponse(
+                    c.getId(),
+                    c.getContent(),
+                    c.getCreatedAt(),
+                    new UserResponse(
+                            c.getUser().getUserId(),
+                            null, null, c.getUser().getFullname(), null, null, null, null),
+                    null,
+                    c.getParent() != null ? c.getParent().getId() : null)).toList();
+            return ApiResponse.<List<CommentResponse>>builder()
+                    .result(dtos)
                     .build();
         } catch (Exception e) {
             e.printStackTrace();
@@ -112,12 +128,22 @@ public class ProductController {
 
     // Update a comment
     @PutMapping("/{productId}/comments/{commentId}")
-    public ApiResponse<Comment> updateProductComment(
+    public ApiResponse<CommentResponse> updateProductComment(
             @PathVariable Long productId,
             @PathVariable Long commentId,
             @RequestBody CommentRequest request) {
-        return ApiResponse.<Comment>builder()
-                .result(commentService.updateComment(commentId, request.getContent()))
+        Comment updated = commentService.updateComment(commentId, request.getContent());
+        // Map entity sang DTO
+        CommentResponse dto = new CommentResponse(
+                updated.getId(),
+                updated.getContent(),
+                updated.getCreatedAt(),
+                new UserResponse(updated.getUser().getUserId(), null, null, updated.getUser().getFullname(), null, null,
+                        null, null),
+                null,
+                null);
+        return ApiResponse.<CommentResponse>builder()
+                .result(dto)
                 .build();
     }
 

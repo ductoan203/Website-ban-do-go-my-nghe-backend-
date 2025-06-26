@@ -40,8 +40,8 @@ public enum ErrorCode {
     // Comment related errors
     COMMENT_NOT_FOUND("Comment not found", 1024, HttpStatus.NOT_FOUND),
     ACCESS_DENIED("Access denied", 1025, HttpStatus.FORBIDDEN),
-    INVALID_ORDER_STATUS_TRANSITION("Chuyển đổi trạng thái đơn hàng không hợp lệ", 1026, HttpStatus.BAD_REQUEST)
-
+    INVALID_ORDER_STATUS_TRANSITION("Chuyển đổi trạng thái đơn hàng không hợp lệ", 1026, HttpStatus.BAD_REQUEST),
+    PAYMENT_ERROR("Payment error occurred", 1027, HttpStatus.INTERNAL_SERVER_ERROR)
     ;
 
     private String message;

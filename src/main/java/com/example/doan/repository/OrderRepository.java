@@ -2,6 +2,8 @@ package com.example.doan.repository;
 
 import com.example.doan.entity.Order;
 import com.example.doan.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -33,4 +35,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     long countByCreatedAtBetween(Instant start, Instant end);
 
     List<Order> findTop5ByOrderByCreatedAtDesc();
+
+    Page<Order> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    Page<Order> findByStatusOrderByCreatedAtDesc(Order.OrderStatus status, Pageable pageable);
+
+    List<Order> findByPaymentMethodAndStatusAndCreatedAtBefore(
+            String paymentMethod,
+            Order.OrderStatus status,
+            Instant createdBefore);
 }
