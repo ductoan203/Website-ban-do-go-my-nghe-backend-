@@ -112,7 +112,10 @@ public class VNPayService {
             vnp_Params.put("vnp_Amount",
                     String.valueOf(orderRequest.getTotal().multiply(BigDecimal.valueOf(100)).longValue()));
             vnp_Params.put("vnp_CurrCode", "VND");
-            String orderId = UUID.randomUUID().toString();
+            String orderId = orderRequest.getId() != null ? orderRequest.getId().toString() : null;
+            if (orderId == null) {
+                throw new IllegalArgumentException("OrderRequest phải có id (orderId) để làm vnp_TxnRef");
+            }
             vnp_Params.put("vnp_TxnRef", orderId);
             vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang #" + orderId);
             vnp_Params.put("vnp_OrderType", "other");
@@ -120,35 +123,35 @@ public class VNPayService {
             vnp_Params.put("vnp_ReturnUrl", vnpayConfig.getReturnUrl());
             vnp_Params.put("vnp_IpAddr", vnp_IpAddr);
             vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
-            String expireDate = LocalDateTime.now().plusMinutes(15).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+            String expireDate = LocalDateTime.now().plusMinutes(15)
+                    .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
             vnp_Params.put("vnp_ExpireDate", expireDate);
-
 
             // 1. KHÔNG thêm vnp_SecureHash vào map khi tạo hashData
             List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
             Collections.sort(fieldNames);
             StringBuilder hashData = new StringBuilder();
-//            for (int i = 0; i < fieldNames.size(); i++) {
-//                String fieldName = fieldNames.get(i);
-//                String fieldValue = vnp_Params.get(fieldName);
-//                if (fieldValue != null && fieldValue.length() > 0) {
-//                    hashData.append(fieldName).append("=").append(fieldValue);
-//                }
-//                if (i < fieldNames.size() - 1) {
-//                    hashData.append("&");
-//                }
-//            }
+            // for (int i = 0; i < fieldNames.size(); i++) {
+            // String fieldName = fieldNames.get(i);
+            // String fieldValue = vnp_Params.get(fieldName);
+            // if (fieldValue != null && fieldValue.length() > 0) {
+            // hashData.append(fieldName).append("=").append(fieldValue);
+            // }
+            // if (i < fieldNames.size() - 1) {
+            // hashData.append("&");
+            // }
+            // }
             StringBuilder query = new StringBuilder();
             Iterator itr = fieldNames.iterator();
             while (itr.hasNext()) {
                 String fieldName = (String) itr.next();
                 String fieldValue = (String) vnp_Params.get(fieldName);
                 if ((fieldValue != null) && (fieldValue.length() > 0)) {
-                    //Build hash data
+                    // Build hash data
                     hashData.append(fieldName);
                     hashData.append('=');
                     hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                    //Build query
+                    // Build query
                     query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
                     query.append('=');
                     query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
@@ -163,24 +166,26 @@ public class VNPayService {
             log.info("🌐 [VNPAY] vnp_SecureHash: {}", vnp_SecureHash);
 
             // 2. Tạo query string (chỉ encode ở đây)
-//            StringBuilder query = new StringBuilder();
-//            for (int i = 0; i < fieldNames.size(); i++) {
-//                String fieldName = fieldNames.get(i);
-//                String fieldValue = vnp_Params.get(fieldName);
-//                if (fieldValue != null && fieldValue.length() > 0) {
-//                    query.append(URLEncoder.encode(fieldName, StandardCharsets.UTF_8)).append("=")
-//                            .append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8));
-//                    if (i < fieldNames.size() - 1) {
-//                        query.append("&");
-//                    }
-//                }
-//            }
-//            if (query.length() > 0)
-//                query.append("&");
+            // StringBuilder query = new StringBuilder();
+            // for (int i = 0; i < fieldNames.size(); i++) {
+            // String fieldName = fieldNames.get(i);
+            // String fieldValue = vnp_Params.get(fieldName);
+            // if (fieldValue != null && fieldValue.length() > 0) {
+            // query.append(URLEncoder.encode(fieldName,
+            // StandardCharsets.UTF_8)).append("=")
+            // .append(URLEncoder.encode(fieldValue, StandardCharsets.UTF_8));
+            // if (i < fieldNames.size() - 1) {
+            // query.append("&");
+            // }
+            // }
+            // }
+            // if (query.length() > 0)
+            // query.append("&");
             String queryUrl = query.toString();
-//            String vnp_SecureHash = VNPayConfig.hmacSHA512(VNPayConfig.secretKey, hashData.toString());
+            // String vnp_SecureHash = VNPayConfig.hmacSHA512(VNPayConfig.secretKey,
+            // hashData.toString());
             queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
-//            query.append("vnp_SecureHash=").append(vnp_SecureHash);
+            // query.append("vnp_SecureHash=").append(vnp_SecureHash);
 
             String finalUrl = vnpayConfig.getPayUrl() + "?" + queryUrl;
             log.info("🌐 [VNPAY] Final URL: {}", finalUrl);

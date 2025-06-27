@@ -153,6 +153,9 @@ public class PaymentService {
         }
         Order savedOrder = orderRepository.save(order);
 
+        // Gán id cho orderRequest nếu có (để truyền cho VNPAY)
+        request.setId(savedOrder.getId());
+
         logger.info("[PAYMENT] orderId: {}, userId trong order: {}", savedOrder.getId(),
                 savedOrder.getUser() != null ? savedOrder.getUser().getUserId() : null);
         logger.info("[PAYMENT] === KẾT THÚC HANDLE CHECKOUT ===");
@@ -161,21 +164,17 @@ public class PaymentService {
 
     @Scheduled(fixedRate = 300000) // Chạy mỗi 5 phút
     @Transactional
-    public void cleanupPendingPayOSOrders() {
+    public void cleanupPendingOnlineOrders() {
         try {
-            // Tìm các đơn PayOS PENDING cũ hơn 30 phút
-            List<Order> pendingOrders = orderRepository.findByPaymentMethodAndStatusAndCreatedAtBefore(
-                    "PAYOS",
-                    Order.OrderStatus.PENDING,
-                    Instant.now().minusSeconds(1800) // 30 phút
-            );
-
+            Instant expired = Instant.now().minusSeconds(1800); // 30 phút
+            List<Order> pendingOrders = orderRepository.findByStatusAndCreatedAtBefore(Order.OrderStatus.PENDING,
+                    expired);
             if (!pendingOrders.isEmpty()) {
-                logger.info("Cleaning up {} pending PayOS orders", pendingOrders.size());
+                logger.info("Cleaning up {} pending online orders (VNPAY, PAYOS, MOMO)", pendingOrders.size());
                 orderRepository.deleteAll(pendingOrders);
             }
         } catch (Exception e) {
-            logger.error("Error cleaning up pending PayOS orders", e);
+            logger.error("Error cleaning up pending online orders", e);
         }
     }
 

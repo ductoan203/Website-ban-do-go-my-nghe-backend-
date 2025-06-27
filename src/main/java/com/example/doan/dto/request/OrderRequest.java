@@ -15,4 +15,5 @@ public class OrderRequest {
     private String paymentStatus;
     private List<CartItemRequest> items;
     private BigDecimal total;
+    private Long id;
 }

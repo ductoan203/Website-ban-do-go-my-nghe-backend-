@@ -54,6 +54,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/payment/momo/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/payment/vnpay/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/payment/vnpay/**").permitAll()
+                .requestMatchers("/doan/payment/vnpay/ipn").permitAll()
                 .requestMatchers(HttpMethod.POST, "/admin/products/upload-image").permitAll()
                 .requestMatchers(HttpMethod.GET, "/products/**", "/categories/**", "/doan/products/**",
                         "/doan/categories/**", "/auth/test-email")

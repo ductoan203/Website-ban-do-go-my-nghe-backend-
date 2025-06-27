@@ -40,8 +40,5 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Page<Order> findByStatusOrderByCreatedAtDesc(Order.OrderStatus status, Pageable pageable);
 
-    List<Order> findByPaymentMethodAndStatusAndCreatedAtBefore(
-            String paymentMethod,
-            Order.OrderStatus status,
-            Instant createdBefore);
+    List<Order> findByStatusAndCreatedAtBefore(Order.OrderStatus status, java.time.Instant createdBefore);
 }

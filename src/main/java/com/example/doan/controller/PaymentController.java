@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.TreeMap;
 
@@ -36,6 +37,8 @@ import java.util.stream.Collectors;
 import java.math.BigDecimal;
 
 import static com.example.doan.service.VNPayService.hmacSHA512;
+
+import java.util.ArrayList;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -56,6 +59,8 @@ public class PaymentController {
     private final VNPayService vnPayService;
     @Autowired
     private final PayOSService payOSService;
+    @Autowired
+    private final CartService cartService;
 
     @PostMapping("/checkout")
     public ApiResponse<OrderResponse> checkout(@RequestBody OrderRequest request) {
@@ -223,6 +228,14 @@ public class PaymentController {
     @PostMapping("/vnpay/create")
     public ResponseEntity<?> createVnpayUrl(HttpServletRequest request, @RequestBody OrderRequest orderRequest) {
         try {
+            // 1. Tạo đơn hàng PENDING trước
+            String username = null;
+            try {
+                username = SecurityContextHolder.getContext().getAuthentication().getName();
+            } catch (Exception ignored) {
+            }
+            Order order = paymentService.handleCheckout(username, orderRequest); // trạng thái PENDING
+            orderRequest.setId(order.getId()); // Gán orderId thật vào orderRequest để truyền cho VNPAY
             String orderInfo = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(orderRequest);
             String url = vnPayService.createPaymentUrlWithOrderInfo(request, orderRequest, orderInfo);
             return ResponseEntity.ok(url);
@@ -232,10 +245,10 @@ public class PaymentController {
         }
     }
 
-    @PostMapping("/vnpay/ipn")
+    @RequestMapping(value = "/vnpay/ipn", method = { RequestMethod.POST, RequestMethod.GET })
     public ResponseEntity<String> handleVnpayIpn(@RequestParam Map<String, String> params) {
         try {
-            log.info("📥 [IPN] Nhận thông báo VNPAY: {}", params);
+            log.info("\ud83d\udce5 [IPN] Nhận thông báo VNPAY: {}", params);
 
             // Bước 1: Lấy SecureHash từ request
             String receivedHash = params.get("vnp_SecureHash");
@@ -250,27 +263,45 @@ public class PaymentController {
 
             StringBuilder hashData = new StringBuilder();
             for (Map.Entry<String, String> entry : sorted.entrySet()) {
-                hashData.append(entry.getKey()).append("=").append(entry.getValue()).append("&");
+                hashData.append(entry.getKey()).append("=")
+                        .append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8)).append("&");
             }
             hashData.setLength(hashData.length() - 1);
 
             String myHash = HmacUtils.hmacSha512Hex(vnPayService.getHashSecret(), hashData.toString());
 
             if (!myHash.equalsIgnoreCase(receivedHash)) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("INVALID_SIGNATURE");
+                log.warn("[IPN] Sai chữ ký xác thực từ VNPAY. Hash của tôi: {}, Hash nhận: {}", myHash, receivedHash);
+                return ResponseEntity.ok("{" +
+                        "\"RspCode\":\"97\"," +
+                        "\"Message\":\"INVALID_SIGNATURE\"}");
             }
 
             // ✅ Đúng chữ ký => xử lý đơn hàng
-            if ("00".equals(params.get("vnp_ResponseCode"))) {
+            String orderIdStr = params.get("vnp_TxnRef");
+            if (orderIdStr != null && orderIdStr.matches("\\d+")) {
+                Long orderId = Long.parseLong(orderIdStr);
+                Order order = null;
                 try {
-                    String orderInfo = params.get("vnp_OrderInfo");
-                    OrderRequest orderRequest = new com.fasterxml.jackson.databind.ObjectMapper().readValue(orderInfo,
-                            OrderRequest.class);
-                    Order order = paymentService.handleCheckout(null, orderRequest);
+                    order = orderService.findById(orderId);
+                } catch (Exception ex) {
+                    log.error("[IPN] Không tìm thấy đơn hàng với orderId {}", orderIdStr);
+                    return ResponseEntity.ok("{" +
+                            "\"RspCode\":\"01\"," +
+                            "\"Message\":\"ORDER_NOT_FOUND\"}");
+                }
+                if (order != null && "00".equals(params.get("vnp_ResponseCode"))
+                        && "00".equals(params.get("vnp_TransactionStatus"))) {
                     order.setPaymentStatus("PAID");
                     order.setStatus(Order.OrderStatus.CONFIRMED);
                     orderService.save(order);
                     orderService.deductStock(order);
+                    // XÓA GIỎ HÀNG nếu có user đăng nhập
+                    if (order.getUser() != null) {
+                        cartService.getMyCart(order.getUser()).getItems().clear();
+                        cartService.getMyCart(order.getUser()).setItems(new ArrayList<>());
+                        cartService.getMyCart(order.getUser());
+                    }
                     emailService.sendOrderConfirmationEmail(
                             order.getEmail(),
                             order.getCustomerName(),
@@ -278,22 +309,35 @@ public class PaymentController {
                             order.getTotal(),
                             order.getPaymentMethod(),
                             order.getShippingAddress());
-                } catch (Exception e) {
-                    e.printStackTrace();
+                    log.info("[IPN] Đã cập nhật trạng thái đơn hàng {} sang PAID/CONFIRMED và gửi email", orderId);
+                    return ResponseEntity.ok("{" +
+                            "\"RspCode\":\"00\"," +
+                            "\"Message\":\"SUCCESS\"}");
+                } else {
+                    log.warn(
+                            "[IPN] Đơn hàng {} không hợp lệ hoặc trạng thái giao dịch không thành công. vnp_ResponseCode={}, vnp_TransactionStatus={}",
+                            orderId, params.get("vnp_ResponseCode"), params.get("vnp_TransactionStatus"));
+                    return ResponseEntity.ok("{" +
+                            "\"RspCode\":\"02\"," +
+                            "\"Message\":\"ORDER_INVALID_STATUS\"}");
                 }
+            } else {
+                log.error("[IPN] Không tìm thấy orderId trong request hoặc orderId không hợp lệ: {}", orderIdStr);
+                return ResponseEntity.ok("{" +
+                        "\"RspCode\":\"01\"," +
+                        "\"Message\":\"ORDER_ID_INVALID\"}");
             }
-
-            return ResponseEntity.ok("IPN_RECEIVED");
-
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("ERROR");
+            log.error("[IPN] Lỗi xử lý IPN: {}", e.getMessage(), e);
+            return ResponseEntity.ok("{" +
+                    "\"RspCode\":\"99\"," +
+                    "\"Message\":\"ERROR\"}");
         }
     }
 
     @GetMapping("/vnpay/return")
     public ResponseEntity<String> handleVnpayReturn(@RequestParam Map<String, String> allParams) {
-        System.out.println("📥 VNPAY RETURN: " + allParams);
+        System.out.println("\ud83d\udce5 VNPAY RETURN: " + allParams);
 
         String receivedHash = allParams.get("vnp_SecureHash");
 
@@ -306,7 +350,8 @@ public class PaymentController {
 
         StringBuilder hashData = new StringBuilder();
         for (Map.Entry<String, String> entry : sortedParams.entrySet()) {
-            hashData.append(entry.getKey()).append('=').append(entry.getValue()).append('&');
+            hashData.append(entry.getKey()).append('=')
+                    .append(entry.getValue()).append('&');
         }
         if (hashData.length() > 0) {
             hashData.setLength(hashData.length() - 1);
@@ -319,46 +364,25 @@ public class PaymentController {
             return ResponseEntity.status(500).body("Lỗi tạo chữ ký: " + e.getMessage());
         }
 
-        System.out.println("✅ So sánh chữ ký:");
+        System.out.println("\u2705 So sánh chữ ký:");
         System.out.println("Generated: " + myHash);
         System.out.println("Received : " + receivedHash);
 
         if (!myHash.equalsIgnoreCase(receivedHash)) {
-            return ResponseEntity.badRequest().body("❌ Sai chữ ký xác thực từ VNPAY");
+            return ResponseEntity.badRequest().body("\u274c Sai chữ ký xác thực từ VNPAY");
         }
 
-        try {
-            Long orderId = Long.parseLong(allParams.get("vnp_TxnRef"));
-            Order order = orderService.findById(orderId);
+        // KHÔNG xử lý đơn hàng ở đây, chỉ trả về kết quả cho FE
+        String html = "<html><head>"
+                + "<meta http-equiv='refresh' content='5; url=http://localhost:5173' />"
+                + "<style>body{font-family:sans-serif;text-align:center;margin-top:100px;}</style>"
+                + "</head><body>"
+                + "<h2 style='color:green'>🎉 Thanh toán VNPAY thành công!</h2>"
+                + "<p>Đơn hàng đã được ghi nhận.</p>"
+                + "<p>Bạn sẽ được chuyển về trang chủ sau vài giây...</p>"
+                + "</body></html>";
 
-            order.setPaymentStatus("PAID");
-            order.setStatus(Order.OrderStatus.CONFIRMED);
-            orderService.save(order);
-            orderService.deductStock(order);
-
-            emailService.sendOrderConfirmationEmail(
-                    order.getEmail(),
-                    order.getCustomerName(),
-                    order.getId().toString(),
-                    order.getTotal(),
-                    order.getPaymentMethod(),
-                    order.getShippingAddress());
-
-            String html = "<html><head>"
-                    + "<meta http-equiv='refresh' content='5; url=http://localhost:5173' />"
-                    + "<style>body{font-family:sans-serif;text-align:center;margin-top:100px;}</style>"
-                    + "</head><body>"
-                    + "<h2 style='color:green'>🎉 Thanh toán VNPAY thành công!</h2>"
-                    + "<p>Đơn hàng đã được ghi nhận.</p>"
-                    + "<p>Bạn sẽ được chuyển về trang chủ sau vài giây...</p>"
-                    + "</body></html>";
-
-            return ResponseEntity.ok().body(html);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("❌ Lỗi xử lý đơn hàng sau thanh toán");
-        }
+        return ResponseEntity.ok().body(html);
     }
 
     @PostMapping("/payos/create")
